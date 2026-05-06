@@ -1,0 +1,36 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+    provider = "prisma-client"
+    output   = "../generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model User {
+    id String @id @default(cuid())
+    wallet_address String @unique
+    created_at DateTime @default(now())
+    buckets Bucket[]
+}
+
+model Asset {
+    id String @id @unique
+    name String
+    listing Listing[]
+    // think about what the asset will contain
+}
+
+model Nonce {
+    id String @id @default(cuid())
+    wallet_address String
+    value String
+    used Boolean
+    expires_at DateTime // expiresAt: new Date(Date.now() + 5 * 60 * 1000) 
+    created_at DateTime @default(now())
+}
