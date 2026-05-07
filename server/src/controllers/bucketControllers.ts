@@ -1,5 +1,9 @@
 import { status, type Context } from "elysia";
+import { TOKEN_CATALOG_BY_ID } from "../constants/tokenCatalog";
+import { INVEST_PROTOCOL_FEE_RATE } from "../constants/fees";
 import { prisma } from "../db";
+import { grossLamportsFromSol, verifyInvestTransfer } from "../investTxVerify";
+import { toJsonSafe } from "../jsonSafe";
 import {
   addBucketAssetsSchema,
   createBucketSchema,
@@ -11,12 +15,22 @@ import {
 } from "../types";
 
 const getAllBuckets = async ({
-  query
+  query: rawQuery
 }: decoratedContext<Context<{ query: listBucketsQuerySchema }>>) => {
   try {
-    const where: { name?: string; creatorId?: string } = {};
+    const query = rawQuery ?? {};
+    const where: {
+      name?: string;
+      creatorId?: string;
+      type?: "PUBLISHED" | "DRAFT";
+    } = {};
     if (query.name) where.name = query.name;
-    if (query.creatorId) where.creatorId = query.creatorId;
+    if (query.creatorId) {
+      where.creatorId = query.creatorId;
+      if (query.status) where.type = query.status;
+    } else {
+      where.type = "PUBLISHED";
+    }
 
     const buckets = await prisma.bucket.findMany({
       where,
@@ -26,8 +40,9 @@ const getAllBuckets = async ({
         creator: { select: { id: true, username: true, walletAddress: true } }
       }
     });
-    return status(200, response(true, buckets, null));
-  } catch {
+    return status(200, response(true, toJsonSafe(buckets), null));
+  } catch (e) {
+    console.error("[getAllBuckets]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
@@ -62,8 +77,9 @@ const createBucket = async ({
         creator: { select: { id: true, username: true, walletAddress: true } }
       }
     });
-    return status(201, response(true, createdBucket, null));
-  } catch {
+    return status(201, response(true, toJsonSafe(createdBucket), null));
+  } catch (e) {
+    console.error("[createBucket]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
@@ -76,12 +92,14 @@ const getBucketById = async ({
       where: { id: params.id },
       include: {
         listing: { include: { asset: true } },
-        creator: { select: { id: true, username: true, walletAddress: true } }
+        creator: { select: { id: true, username: true, walletAddress: true } },
+        _count: { select: { deposits: true, listing: true } }
       }
     });
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
-    return status(200, response(true, bucket, null));
-  } catch {
+    return status(200, response(true, toJsonSafe(bucket), null));
+  } catch (e) {
+    console.error("[getBucketById]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
@@ -96,9 +114,37 @@ const investInBucket = async ({
   try {
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
 
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const rpcUrl = process.env.SOLANA_RPC_URL?.trim();
+    const treasuryPk = process.env.INVEST_TREASURY_PUBKEY?.trim();
+    if (!rpcUrl || !treasuryPk) {
+      return status(503, response(false, null, errors.investNotConfigured503));
+    }
+
+    const gross = Number(body.amount);
+    if (!Number.isFinite(gross) || gross <= 0) {
       return status(400, response(false, null, errors.typeBox400));
+    }
+
+    let expectedLamports: bigint;
+    try {
+      expectedLamports = grossLamportsFromSol(gross);
+    } catch {
+      return status(400, response(false, null, errors.typeBox400));
+    }
+
+    const sig = body.transactionSignature.trim();
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { walletAddress: true }
+    });
+    if (!user) return status(401, response(false, null, errors.unauthorized401));
+
+    const dup = await prisma.deposit.findUnique({
+      where: { transactionSignature: sig },
+      select: { id: true }
+    });
+    if (dup) {
+      return status(409, response(false, null, errors.investTxDuplicate409));
     }
 
     const bucket = await prisma.bucket.findUnique({
@@ -110,34 +156,71 @@ const investInBucket = async ({
       return status(400, response(false, null, errors.bucketNotPublished400));
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const deposit = await tx.deposit.create({
-        data: {
-          bucketId: bucket.id,
-          userId,
-          amount
-        }
+    try {
+      await verifyInvestTransfer({
+        rpcUrl,
+        signature: sig,
+        expectedFrom: user.walletAddress,
+        expectedTo: treasuryPk,
+        expectedLamports
       });
-      const bucketUpdate = await tx.bucket.update({
-        where: { id: bucket.id },
-        data: { tvl: Number(bucket.tvl) + amount }
-      });
-      return { deposit, bucketUpdate };
-    });
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      console.error("[investInBucket verify]", m);
+      if (m === "INVEST_TX_NOT_FOUND") {
+        return status(400, response(false, null, errors.investTxNotFound400));
+      }
+      return status(400, response(false, null, errors.investTxVerify400));
+    }
 
-    return status(
-      201,
-      response(
-        true,
-        {
-          message: "Investment successful",
-          deposit: result.deposit,
-          bucket: result.bucketUpdate
-        },
-        null
-      )
-    );
-  } catch {
+    const feeTotal = gross * INVEST_PROTOCOL_FEE_RATE;
+    const feeCreator = feeTotal / 2;
+    const feePlatform = feeTotal - feeCreator;
+    const net = gross - feeTotal;
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const deposit = await tx.deposit.create({
+          data: {
+            bucketId: bucket.id,
+            userId,
+            amount: net,
+            feeCreator,
+            feePlatform,
+            transactionSignature: sig
+          }
+        });
+        const bucketUpdate = await tx.bucket.update({
+          where: { id: bucket.id },
+          data: { tvl: Number(bucket.tvl) + net }
+        });
+        return { deposit, bucketUpdate, gross, feeTotal, feeCreator, feePlatform, net };
+      });
+
+      const resultMessage = {
+        message: "Investment successful",
+        transactionSignature: sig,
+        deposit: result.deposit,
+        bucket: result.bucketUpdate,
+        breakdown: {
+          grossAmount: result.gross,
+          protocolFeeRate: INVEST_PROTOCOL_FEE_RATE,
+          feeTotal: result.feeTotal,
+          feeCreator: result.feeCreator,
+          feePlatform: result.feePlatform,
+          netToPool: result.net
+        }
+      };
+      return status(201, response(true, toJsonSafe(resultMessage), null));
+    } catch (e) {
+      const code = e && typeof e === "object" && "code" in e ? (e as { code: string }).code : "";
+      if (code === "P2002") {
+        return status(409, response(false, null, errors.investTxDuplicate409));
+      }
+      throw e;
+    }
+  } catch (e) {
+    console.error("[investInBucket]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
@@ -156,6 +239,9 @@ const addBucketAssets = async ({
       where: { id: params.id }
     });
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+    if (bucket.creatorId !== userId) {
+      return status(403, response(false, null, errors.bucketCreator403));
+    }
     if (bucket.type !== "DRAFT") {
       return status(400, response(false, null, errors.bucketNotDraft400));
     }
@@ -170,15 +256,30 @@ const addBucketAssets = async ({
       return status(400, response(false, null, errors.typeBox400));
     }
 
-    const found = await prisma.asset.findMany({
-      where: { id: { in: assetIds } },
-      select: { id: true }
-    });
-    if (found.length !== assetIds.length) {
-      return status(400, response(false, null, errors.typeBox400));
+    for (const id of assetIds) {
+      const exists = await prisma.asset.findUnique({ where: { id }, select: { id: true } });
+      if (exists) continue;
+      if (!TOKEN_CATALOG_BY_ID.has(id)) {
+        return status(400, response(false, null, errors.unknownAsset400));
+      }
     }
 
     await prisma.$transaction(async (tx) => {
+      for (const id of assetIds) {
+        const existing = await tx.asset.findUnique({ where: { id } });
+        if (existing) continue;
+        const meta = TOKEN_CATALOG_BY_ID.get(id)!;
+        await tx.asset.create({
+          data: {
+            id: meta.id,
+            name: meta.name,
+            symbol: meta.symbol,
+            iconUrl: meta.iconUrl,
+            decimals: meta.decimals
+          }
+        });
+      }
+
       await tx.listing.deleteMany({ where: { bucketId: params.id } });
       await tx.listing.createMany({
         data: body.assets.map((a) => ({
@@ -201,8 +302,9 @@ const addBucketAssets = async ({
       return status(500, response(false, null, errors.serverError500));
     }
 
-    return status(200, response(true, updated, null));
-  } catch {
+    return status(200, response(true, toJsonSafe(updated), null));
+  } catch (e) {
+    console.error("[addBucketAssets]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
@@ -215,11 +317,18 @@ const publishBucket = async ({
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
 
     const bucket = await prisma.bucket.findUnique({
-      where: { id: params.id }
+      where: { id: params.id },
+      include: { _count: { select: { listing: true } } }
     });
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+    if (bucket.creatorId !== userId) {
+      return status(403, response(false, null, errors.bucketCreator403));
+    }
     if (bucket.type !== "DRAFT") {
       return status(400, response(false, null, errors.bucketAlreadyPublished400));
+    }
+    if (bucket._count.listing === 0) {
+      return status(400, response(false, null, errors.bucketNoAssets400));
     }
 
     const published = await prisma.bucket.update({
@@ -227,12 +336,14 @@ const publishBucket = async ({
       data: { type: "PUBLISHED" },
       include: {
         listing: { include: { asset: true } },
-        creator: { select: { id: true, username: true, walletAddress: true } }
+        creator: { select: { id: true, username: true, walletAddress: true } },
+        _count: { select: { deposits: true, listing: true } }
       }
     });
 
-    return status(200, response(true, published, null));
-  } catch {
+    return status(200, response(true, toJsonSafe(published), null));
+  } catch (e) {
+    console.error("[publishBucket]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
@@ -249,6 +360,9 @@ const forkBucketVersion = async ({
       include: { listing: true }
     });
     if (!source) return status(404, response(false, null, errors.bucketNotFound404));
+    if (source.creatorId !== userId) {
+      return status(403, response(false, null, errors.bucketCreator403));
+    }
 
     const agg = await prisma.bucket.aggregate({
       where: { creatorId: source.creatorId, name: source.name },
@@ -287,8 +401,9 @@ const forkBucketVersion = async ({
       });
     });
 
-    return status(201, response(true, newBucket, null));
-  } catch {
+    return status(201, response(true, toJsonSafe(newBucket), null));
+  } catch (e) {
+    console.error("[forkBucketVersion]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };

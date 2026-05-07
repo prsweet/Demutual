@@ -9,11 +9,19 @@
   "peerDependencies": {
     "typescript": "^5"
   },
+  "scripts": {
+    "dev": "bun run src/index.ts --hot",
+    "start": "bun run src/index.ts",
+    "db:generate": "prisma generate --schema src/prisma/schema.prisma",
+    "db:push": "prisma db push --schema src/prisma/schema.prisma"
+  },
   "dependencies": {
+    "@elysiajs/cors": "^1.4.2",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@solana-program/system": "^0.12.0",
     "@solana/kit": "^6.8.0",
+    "@solana/web3.js": "^1.98.4",
     "@types/jsonwebtoken": "^9.0.10",
     "elysia": "^1.4.28",
     "jsonwebtoken": "^9.0.3",

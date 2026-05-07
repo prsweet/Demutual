@@ -1,66 +1,87 @@
 import { status, type Context } from "elysia";
-import { errors, nonceCreateSchema, response, walletAuthSchema, type decoratedContext } from "../types";
 import { prisma } from "../db";
+import { toJsonSafe } from "../jsonSafe";
+import { errors, nonceCreateSchema, response, walletAuthSchema, type decoratedContext } from "../types";
 import { sign } from "jsonwebtoken";
 import { address, getBase58Codec, getPublicKeyFromAddress, getUtf8Codec, isSignatureBytes, verifySignature } from "@solana/kit";
 
 const walletLogin = async ({ body, set }: decoratedContext<Context<{ body: walletAuthSchema }>>) => {
-  const nonceRecorded = await prisma.nonce.findFirst({
-    where: {
-      walletAddress: body.address,
-      value: body.details.nonce,
-      used: false,
-      expiresAt: { gte: new Date() },
-    }
-  });
-  if (!nonceRecorded) return status(402, response(false, null, errors.nonce402));
-  
-  const pubkey = await getPublicKeyFromAddress(address(body.address));
-  const signatureBytes = getBase58Codec().encode(body.signature);
-  const messageBytes = getUtf8Codec().encode(body.details.message);
-  if (!isSignatureBytes(signatureBytes)) return status(400, response(false, null, errors.typeBox400));
-  
-  const signatureAuthorized = await verifySignature(pubkey, signatureBytes, messageBytes);
-  if (!signatureAuthorized) return status(402, response(false, null, errors.nonce402));
-  await prisma.nonce.update({
-    where: { id: nonceRecorded.id },
-    data: { used: true }
-  });
-  
-  let logingUser = await prisma.user.findFirst({
-    where: { walletAddress: body.address }
-  });
-  if (!logingUser) {
-    const username = body.username?.trim();
-    if (!username) {
-      return status(400, response(false, null, errors.typeBox400));
-    }
-    set.status = 201;
-    logingUser = await prisma.user.create({
-      data: { walletAddress: body.address, username }
+  try {
+    const nonceRecorded = await prisma.nonce.findFirst({
+      where: {
+        walletAddress: body.address,
+        value: body.details.nonce,
+        used: false,
+        expiresAt: { gte: new Date() }
+      }
     });
-  }
+    if (!nonceRecorded) return status(402, response(false, null, errors.nonce402));
 
-  const token = sign({ userId: logingUser.id }, process.env.JWT_SECRET!);
-  return response(true, { token }, null);
+    if (!body.details.message.includes(body.details.nonce)) {
+      return status(400, response(false, null, errors.walletLoginMessageNonce400));
+    }
+
+    const pubkey = await getPublicKeyFromAddress(address(body.address));
+    const signatureBytes = getBase58Codec().encode(body.signature);
+    const messageBytes = getUtf8Codec().encode(body.details.message);
+    if (!isSignatureBytes(signatureBytes)) return status(400, response(false, null, errors.typeBox400));
+
+    const signatureAuthorized = await verifySignature(pubkey, signatureBytes, messageBytes);
+    if (!signatureAuthorized) return status(402, response(false, null, errors.nonce402));
+    await prisma.nonce.update({
+      where: { id: nonceRecorded.id },
+      data: { used: true }
+    });
+
+    let loginUser = await prisma.user.findFirst({
+      where: { walletAddress: body.address }
+    });
+    if (!loginUser) {
+      const username = body.username?.trim();
+      if (!username) {
+        return status(400, response(false, null, errors.walletLoginUsernameRequired400));
+      }
+      set.status = 201;
+      loginUser = await prisma.user.create({
+        data: { walletAddress: body.address, username }
+      });
+    }
+
+    const secret = process.env.JWT_SECRET!;
+    const token = sign({ userId: loginUser.id }, secret);
+    return response(true, { token }, null);
+  } catch (e) {
+    console.error("[walletLogin]", e);
+    return status(500, response(false, null, errors.serverError500));
+  }
 };
 
-const getNonce = async ({ query }: decoratedContext<Context<{ query: nonceCreateSchema }>>) => {
-  const nonce = await prisma.nonce.create({
-    data: {
-      walletAddress: query.address,
-      value: crypto.randomUUID(),
-      used: false,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+const getNonce = async ({ query: rawQuery }: decoratedContext<Context<{ query: nonceCreateSchema }>>) => {
+  try {
+    const query = rawQuery ?? {};
+    const address = typeof query.address === "string" ? query.address.trim() : "";
+    if (!address) {
+      return status(400, response(false, null, errors.typeBox400));
     }
-  });
-  const nonceResponse = {
-    nonce: nonce.value,
-    message: `Login to Demutual: ${nonce.value}`,
-    expiresAt: nonce.expiresAt
+    const nonce = await prisma.nonce.create({
+      data: {
+        walletAddress: address,
+        value: crypto.randomUUID(),
+        used: false,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+      }
+    });
+    const nonceResponse = {
+      nonce: nonce.value,
+      message: `Login to Demutual: ${nonce.value}`,
+      expiresAt: nonce.expiresAt
+    };
+    return status(200, response(true, toJsonSafe(nonceResponse), null));
+  } catch (e) {
+    console.error("[getNonce]", e);
+    return status(500, response(false, null, errors.serverError500));
   }
-  return status(200, response(true, nonceResponse, null));
-}
+};
 
 export const authControllers = {
   walletLogin,

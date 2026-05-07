@@ -12,3 +12,8 @@ We're building:
 **Traditional mutual funds:** Managed by private firms, high fees (1-2%), opaque decisions
 
 **Your version:** User-created buckets, low fee (0.1%), transparent on-chain
+
+“Colosseum Copilot surfaces many Solana ‘index/basket/vault’ hackathon
+  projects; Demutual narrows on creator-issued, versioned mutual-fund-style
+  portfolios with wallet auth, draft-to-publish fundraising, and transparent
+  allocation history.”

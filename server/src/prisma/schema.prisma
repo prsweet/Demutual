@@ -29,7 +29,14 @@ model Deposit {
     userId String
     bucket Bucket @relation(references: [id], fields: [bucketId])
     user User @relation(references: [id], fields: [userId])
+    /// Net USDC (or unit) credited to the bucket TVL after protocol fee.
     amount Decimal
+    feeCreator Decimal @default(0)
+    feePlatform Decimal @default(0)
+    /// Set when invest is confirmed on-chain (SOL transfer to treasury).
+    transactionSignature String? @unique
+    /// Jupiter basket invest: all swap tx signatures (same order as plan legs).
+    jupiterLegSignatures Json?
     createdAt DateTime @default(now())
 }
 
