@@ -25,8 +25,20 @@ function defaultInvestTreasuryField(): string {
   return (localStorage.getItem(TREASURY_LS_KEY) ?? INVEST_TREASURY).trim();
 }
 
-/** Treasury pubkey: form field (if present) → localStorage → Vite env. */
+/**
+ * Treasury pubkey resolution (single source of truth → fallback chain):
+ *  1. Server `/` → `config.investTreasuryPubkey` (authoritative; matches server verifier).
+ *  2. Manual paste box (legacy dev fallback when no server is reachable).
+ *  3. localStorage cache of last paste.
+ *  4. Vite build-time env `VITE_INVEST_TREASURY_PUBKEY`.
+ */
+function serverTreasury(): string {
+  return state.serverInfo?.investTreasuryPubkey?.trim() ?? "";
+}
+
 function treasuryForInvest(): string {
+  const fromServer = serverTreasury();
+  if (fromServer) return fromServer;
   const el = document.getElementById("invest-treasury") as HTMLInputElement | null;
   const fromInput = el?.value?.trim() ?? "";
   if (fromInput) {
@@ -39,7 +51,7 @@ function treasuryForInvest(): string {
 }
 
 function hasTreasuryConfigured(): boolean {
-  return Boolean(defaultInvestTreasuryField());
+  return Boolean(serverTreasury() || defaultInvestTreasuryField());
 }
 
 const BACKPACK_CONNECT_MS = 60_000;
@@ -199,8 +211,21 @@ function catalogPickerHtml(): string {
         <p class="catalog-sum" id="catalog-sum-line">Selected weights should sum to <strong>100%</strong>.</p>`;
 }
 
+type ServerInfo = {
+  network?: "mainnet" | "devnet";
+  jupiterEnabled?: boolean;
+  treasurySolInvestConfigured?: boolean;
+  treasuryInvestEnabled?: boolean;
+  solanaRpcConfigured?: boolean;
+  jupiterApiHost?: string;
+  investTreasuryPubkey?: string | null;
+  platformFeeBps?: number;
+  platformFeeWalletPubkey?: string | null;
+  creatorFeeBps?: number;
+};
+
 const state = {
-  tab: "marketplace" as "marketplace" | "creator",
+  tab: "marketplace" as "marketplace" | "creator" | "portfolio",
   walletKind: (localStorage.getItem("demutual_wallet_kind") as WalletKind | null) ?? null,
   jwt: localStorage.getItem("demutual_jwt"),
   address: "" as string,
@@ -211,6 +236,9 @@ const state = {
   catalog: [] as CatalogRow[],
   draftBucketId: localStorage.getItem("demutual_draft_bucket_id") ?? "",
   lastInvestAmount: localStorage.getItem("demutual_invest_amt") ?? "0.01",
+  myDeposits: [] as Record<string, unknown>[],
+  myPosition: null as Record<string, unknown> | null,
+  serverInfo: null as ServerInfo | null,
   log: "",
   err: ""
 };
@@ -315,7 +343,23 @@ const API_ERROR_HINT: Record<string, string> = {
   INVEST_TX_ALREADY_RECORDED: "This transaction was already used to record a deposit.",
   JUPITER_PLAN_FAILED:
     "Jupiter could not build a route (wrong cluster, illiquid pair, or network error). Use mainnet wallet + SOLANA_JUPITER_RPC mainnet.",
-  JUPITER_NOTHING_TO_SWAP: "Bucket is 100% SOL — nothing for Jupiter to swap."
+  JUPITER_NOTHING_TO_SWAP: "Bucket is 100% SOL — nothing for Jupiter to swap.",
+  JUPITER_NOT_AVAILABLE_ON_DEVNET:
+    "This server is in devnet mode — Jupiter buy/sell is mainnet only. Use the SOL→treasury invest and the ledger withdraw on devnet, or set DEMUTUAL_NETWORK=mainnet on the server.",
+  JUPITER_SELL_PLAN_FAILED:
+    "Jupiter could not build a sell route — bucket assets may have low liquidity for the requested amount, or the slippage is too tight.",
+  JUPITER_SELL_NOTHING_TO_SWAP: "Bucket is 100% SOL — nothing for Jupiter to sell.",
+  SELL_TX_ALREADY_RECORDED: "These sell signatures were already used to record a withdrawal.",
+  WITHDRAW_EXCEEDS_POSITION: "That amount is more than your net deposited in this bucket.",
+  WITHDRAW_BUCKET_NOT_PUBLISHED: "Withdrawals are only allowed on published buckets.",
+  TREASURY_INVEST_DEVNET_ONLY:
+    "SOL→treasury invest is disabled on mainnet. Use the Jupiter basket below — the investor wallet swaps directly and tokens land in your wallet.",
+  FEE_TRANSFER_SIGNATURE_REQUIRED:
+    "The server expects a platform fee transfer signature. Re-run the buy/sell — the wallet will prompt for the fee transfer.",
+  FEE_TRANSFER_VERIFICATION_FAILED:
+    "Platform fee transfer did not match: same wallet must sign, exact lamports, recipient must equal PLATFORM_FEE_WALLET_PUBKEY.",
+  DEVNET_FAUCET_DISABLED: "Server is not in devnet mode — set DEMUTUAL_NETWORK=devnet to enable the faucet.",
+  DEVNET_FAUCET_RATE_LIMITED: "Devnet faucet rate-limited — wait a minute and try again."
 };
 
 function hintForApiError(code: string): string {
@@ -482,6 +526,8 @@ function logout() {
   state.buckets = [];
   state.assets = [];
   state.bucketDetail = null;
+  state.myDeposits = [];
+  state.myPosition = null;
   state.address = "";
   state.walletKind = null;
   localStorage.removeItem("demutual_wallet_kind");
@@ -502,6 +548,22 @@ function userIdFromJwt(): string {
   }
 }
 
+async function loadServerInfo() {
+  try {
+    const r = await fetch(`${API}/`);
+    const j = (await r.json()) as ApiRes<{ config?: ServerInfo }>;
+    if (j.success && j.data?.config) {
+      state.serverInfo = j.data.config;
+    }
+  } catch (e) {
+    log("Server info fetch failed", e instanceof Error ? e.message : String(e));
+  }
+}
+
+function isMainnetServer(): boolean {
+  return state.serverInfo?.network === "mainnet";
+}
+
 async function refreshBuckets() {
   let path = "/buckets";
   if (state.tab === "creator" && state.jwt) {
@@ -513,6 +575,55 @@ async function refreshBuckets() {
     state.buckets = res.data;
     log(`Listed buckets (${path})`, res.data.length);
   }
+}
+
+async function refreshMyDeposits() {
+  if (!state.jwt) return;
+  const res = await api<Record<string, unknown>[]>("/users/me/deposits");
+  if (res.success) {
+    state.myDeposits = res.data;
+    log("My deposits loaded", res.data.length);
+  }
+}
+
+async function loadMyPosition() {
+  const id = String((document.getElementById("pos-bucket-id") as HTMLInputElement)?.value ?? "").trim();
+  if (!id) {
+    state.err = "Enter a bucket id for position.";
+    render();
+    return;
+  }
+  const res = await api<Record<string, unknown>>(`/buckets/${encodeURIComponent(id)}/my-position`);
+  if (res.success) {
+    state.myPosition = res.data;
+    state.err = "";
+    log("Position loaded", id);
+  } else state.err = hintForApiError(res.error);
+  render();
+}
+
+async function withdrawSubmit(e: Event) {
+  e.preventDefault();
+  const id = String((document.getElementById("withdraw-bucket-id") as HTMLInputElement)?.value ?? "").trim();
+  const amount = Number((document.getElementById("withdraw-amount") as HTMLInputElement)?.value ?? 0);
+  if (!id || !amount) {
+    state.err = "Withdraw needs bucket id and amount.";
+    render();
+    return;
+  }
+  const res = await api<unknown>(`/buckets/${encodeURIComponent(id)}/withdraw`, {
+    method: "POST",
+    body: JSON.stringify({ amount })
+  });
+  if (res.success) {
+    state.err = "";
+    log("Withdraw recorded", res.data);
+    await refreshMyDeposits();
+    await refreshBuckets();
+    const posId = (document.getElementById("pos-bucket-id") as HTMLInputElement)?.value?.trim();
+    if (posId === id) await loadMyPosition();
+  } else state.err = hintForApiError(res.error);
+  render();
 }
 
 async function refreshAssets() {
@@ -780,6 +891,173 @@ type JupiterPlanLeg = {
   swapTransactionBase64?: string;
 };
 
+type FeeSplit = {
+  recipient: "platform" | "creator";
+  toPubkey: string;
+  lamports: number;
+  bps: number;
+};
+type FeeTransfer = { totalLamports: number; splits: FeeSplit[]; reason?: string };
+
+async function signFeeTransfer(
+  provider: InjectedSolanaWallet,
+  connection: Connection,
+  fromAddress: string,
+  fee: FeeTransfer
+): Promise<string> {
+  const from = new PublicKey(fromAddress);
+  const tx = new Transaction();
+  for (const split of fee.splits) {
+    tx.add(
+      SystemProgram.transfer({
+        fromPubkey: from,
+        toPubkey: new PublicKey(split.toPubkey),
+        lamports: split.lamports
+      })
+    );
+  }
+  tx.feePayer = from;
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  tx.recentBlockhash = blockhash;
+  return await walletSendSolTransfer(provider, connection, tx);
+}
+
+function describeFee(fee: FeeTransfer): string {
+  return fee.splits
+    .map((s) => `${(s.lamports / 1e9).toFixed(6)} SOL → ${s.recipient} ${s.toPubkey.slice(0, 6)}…`)
+    .join(" + ");
+}
+
+async function devnetAirdrop() {
+  if (!state.address) {
+    state.err = "Connect a wallet first.";
+    render();
+    return;
+  }
+  state.err = "Requesting 1 devnet SOL…";
+  render();
+  try {
+    const r = await fetch(
+      `${API}/devnet/airdrop?address=${encodeURIComponent(state.address)}&amount=1`
+    );
+    const j = (await r.json()) as ApiRes<{ signature: string }>;
+    if (j.success) {
+      state.err = "";
+      log("Devnet airdrop", j.data);
+    } else {
+      state.err = hintForApiError(j.error);
+    }
+  } catch (e) {
+    state.err = e instanceof Error ? e.message : String(e);
+  }
+  render();
+}
+
+async function jupiterBasketSell() {
+  const id = String((document.getElementById("sell-bucket-id") as HTMLInputElement)?.value ?? "").trim();
+  const amount = Number((document.getElementById("sell-amount") as HTMLInputElement)?.value ?? 0);
+  state.err = "";
+  if (!id || !amount) {
+    state.err = "Set bucket id and SOL target above first.";
+    render();
+    return;
+  }
+  const provider = getConnectedProvider();
+  if (!provider || !state.address) {
+    state.err = "Connect your wallet (same address you used to log in).";
+    render();
+    return;
+  }
+
+  state.err = "Requesting Jupiter sell plan from API…";
+  render();
+
+  try {
+    const planRes = await api<{
+      legs: JupiterPlanLeg[];
+      feeTransfer: FeeTransfer | null;
+    }>(
+      `/buckets/${encodeURIComponent(id)}/sell/jupiter-plan`,
+      {
+        method: "POST",
+        body: JSON.stringify({ solAmount: amount, slippageBps: 80 })
+      }
+    );
+
+    if (!planRes.success) {
+      state.err = hintForApiError(planRes.error);
+      render();
+      return;
+    }
+
+    const swaps = planRes.data.legs.filter(
+      (l): l is JupiterPlanLeg & { swapTransactionBase64: string } =>
+        l.kind === "swap" && typeof l.swapTransactionBase64 === "string" && l.swapTransactionBase64.length > 0
+    );
+
+    if (swaps.length === 0) {
+      state.err = "No sell swap legs returned — bucket may be 100% SOL.";
+      render();
+      return;
+    }
+
+    const connection = new Connection(SOLANA_JUPITER_RPC, "confirmed");
+    const sigs: string[] = [];
+
+    for (let i = 0; i < swaps.length; i++) {
+      const leg = swaps[i]!;
+      state.err = `Approve sell ${i + 1}/${swaps.length} (${leg.symbol ?? "token"} → SOL) in your wallet…`;
+      render();
+      const vtx = VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64));
+      const sig = await signAndSendVersioned(provider, connection, vtx);
+      sigs.push(sig);
+      log(`Jupiter sell leg ${i + 1} confirmed`, sig);
+    }
+
+    let feeTransferSignature: string | undefined;
+    if (planRes.data.feeTransfer && planRes.data.feeTransfer.splits.length > 0) {
+      const fee = planRes.data.feeTransfer;
+      state.err = `Approve fee transfer: ${describeFee(fee)}`;
+      render();
+      feeTransferSignature = await signFeeTransfer(provider, connection, state.address, fee);
+      log("Fee transfer (sell) confirmed", feeTransferSignature);
+    }
+
+    state.err = "Recording withdrawal…";
+    render();
+
+    const done = await api<unknown>(
+      `/buckets/${encodeURIComponent(id)}/sell/jupiter-complete`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          solAmount: amount,
+          transactionSignatures: sigs,
+          ...(feeTransferSignature ? { feeTransferSignature } : {})
+        })
+      }
+    );
+
+    if (done.success) {
+      state.err = "";
+      log("Jupiter basket sell recorded", done.data);
+      await refreshMyDeposits();
+      await refreshBuckets();
+      const posId = (document.getElementById("pos-bucket-id") as HTMLInputElement)?.value?.trim();
+      if (posId === id) await loadMyPosition();
+    } else state.err = hintForApiError(done.error);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "WALLET_NO_SIGN_VERSIONED") {
+      state.err = "Wallet cannot sign versioned transactions — try Phantom desktop.";
+    } else {
+      state.err = msg;
+      log("Jupiter sell failed", msg);
+    }
+  }
+  render();
+}
+
 async function jupiterBasketInvest() {
   const id = String((document.getElementById("invest-bucket-id") as HTMLInputElement)?.value ?? "").trim();
   const amount = Number((document.getElementById("invest-amount") as HTMLInputElement)?.value ?? 0);
@@ -802,6 +1080,7 @@ async function jupiterBasketInvest() {
   try {
     const planRes = await api<{
       legs: JupiterPlanLeg[];
+      feeTransfer: FeeTransfer | null;
     }>(`/buckets/${encodeURIComponent(id)}/invest/jupiter-plan`, {
       method: "POST",
       body: JSON.stringify({ solAmount: amount, slippageBps: 80 })
@@ -827,6 +1106,15 @@ async function jupiterBasketInvest() {
     const connection = new Connection(SOLANA_JUPITER_RPC, "confirmed");
     const sigs: string[] = [];
 
+    let feeTransferSignature: string | undefined;
+    if (planRes.data.feeTransfer && planRes.data.feeTransfer.splits.length > 0) {
+      const fee = planRes.data.feeTransfer;
+      state.err = `Approve fee transfer: ${describeFee(fee)}`;
+      render();
+      feeTransferSignature = await signFeeTransfer(provider, connection, state.address, fee);
+      log("Fee transfer confirmed", feeTransferSignature);
+    }
+
     for (let i = 0; i < swaps.length; i++) {
       const leg = swaps[i]!;
       state.err = `Approve swap ${i + 1}/${swaps.length} (${leg.symbol ?? "token"}) in your wallet…`;
@@ -842,7 +1130,11 @@ async function jupiterBasketInvest() {
 
     const done = await api<unknown>(`/buckets/${encodeURIComponent(id)}/invest/jupiter-complete`, {
       method: "POST",
-      body: JSON.stringify({ solAmount: amount, transactionSignatures: sigs })
+      body: JSON.stringify({
+        solAmount: amount,
+        transactionSignatures: sigs,
+        ...(feeTransferSignature ? { feeTransferSignature } : {})
+      })
     });
 
     if (done.success) {
@@ -870,13 +1162,25 @@ function render() {
       <div>
         <h1>Demutual review UI</h1>
         <div class="badge">API: ${API}</div>
+        <div class="badge">Server network: <strong>${escapeHtml(state.serverInfo?.network ?? "unknown")}</strong>${
+          state.serverInfo?.jupiterEnabled === false ? " · Jupiter disabled" : ""
+        }</div>
         <div class="badge">Solana RPC: ${escapeHtml(SOLANA_RPC)}</div>
         <div class="badge">Jupiter submit RPC: ${escapeHtml(SOLANA_JUPITER_RPC)}</div>
-        <div class="badge">${
-          hasTreasuryConfigured()
-            ? "Treasury: saved in browser or env (must match server)"
-            : "Treasury: paste in Invest panel or set VITE_INVEST_TREASURY_PUBKEY"
-        }</div>
+        ${
+          (state.serverInfo?.platformFeeBps ?? 0) > 0 || (state.serverInfo?.creatorFeeBps ?? 0) > 0
+            ? `<div class="badge">Fees: <strong>${((state.serverInfo!.platformFeeBps ?? 0) / 100).toFixed(2)}%</strong> platform + <strong>${((state.serverInfo!.creatorFeeBps ?? 0) / 100).toFixed(2)}%</strong> creator</div>`
+            : ""
+        }
+        ${
+          state.serverInfo?.network === "devnet"
+            ? `<div class="badge">${
+                hasTreasuryConfigured()
+                  ? "Treasury: configured (devnet only)"
+                  : "Treasury: missing — set INVEST_TREASURY_PUBKEY on the server"
+              }</div>`
+            : ""
+        }
       </div>
       <div class="row">
         ${
@@ -901,11 +1205,70 @@ function render() {
     <div class="tabs">
       <button type="button" class="${state.tab === "marketplace" ? "active" : ""}" data-tab="marketplace">Marketplace</button>
       <button type="button" class="${state.tab === "creator" ? "active" : ""}" data-tab="creator">Creator</button>
+      <button type="button" class="${state.tab === "portfolio" ? "active" : ""}" data-tab="portfolio">Portfolio</button>
       <button class="ghost" type="button" id="btn-refresh-buckets">Refresh buckets</button>
     </div>
 
     ${
-      state.tab === "marketplace"
+      state.tab === "portfolio"
+        ? `
+      <div class="grid2">
+        <div class="panel">
+          <h2>My deposits</h2>
+          <p class="badge">GET /users/me/deposits</p>
+          <button class="ghost" type="button" id="btn-refresh-portfolio" ${state.jwt ? "" : "disabled"}>Refresh</button>
+          <ul class="list" style="max-height:280px;overflow:auto">
+            ${state.myDeposits
+              .map(
+                (d) =>
+                  `<li><strong>${escapeHtml(String((d.bucket as Record<string, unknown>)?.name ?? "?"))}</strong> · net ${escapeHtml(String(d.amount))} · ${escapeHtml(String(d.createdAt ?? "")).slice(0, 19)}</li>`
+              )
+              .join("") || `<li class="badge">No deposits yet.</li>`}
+          </ul>
+        </div>
+        <div class="panel">
+          <h2>Position &amp; withdraw (ledger)</h2>
+          <p class="badge">GET /buckets/:id/my-position · POST /buckets/:id/withdraw — updates TVL in-app; on-chain payout is separate.</p>
+          <label>Bucket id</label>
+          <input id="pos-bucket-id" class="mono" value="${escapeAttr(state.draftBucketId)}" />
+          <button class="ghost" type="button" id="btn-load-position" ${state.jwt ? "" : "disabled"}>Load my position</button>
+          <pre class="log">${escapeHtml(JSON.stringify(state.myPosition, null, 2))}</pre>
+          <form id="form-withdraw">
+            <label>Withdraw — bucket id</label>
+            <input id="withdraw-bucket-id" class="mono" value="${escapeAttr(state.draftBucketId)}" />
+            <label>Amount (same units as booked deposits)</label>
+            <input id="withdraw-amount" type="number" step="any" min="0.000000001" value="1" />
+            <button class="primary" type="submit" ${state.jwt ? "" : "disabled"}>Record withdrawal (ledger)</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Sell basket via Jupiter (mainnet)</h2>
+          <p class="badge hint">ExactOut quotes: each leg pulls the asset from <strong>your</strong> wallet and lands SOL. Use mainnet Phantom + funded wallet. Requires a Jupiter-bought position.</p>
+          <label>Bucket id</label>
+          <input id="sell-bucket-id" class="mono" value="${escapeAttr(state.draftBucketId)}" />
+          <label>SOL target (total SOL you want to receive)</label>
+          <input id="sell-amount" type="number" step="any" min="0.000000001" value="0.01" />
+          <button class="primary" type="button" id="btn-jupiter-sell" ${
+            state.jwt && state.address && isMainnetServer() ? "" : "disabled"
+          }>Build sell plan, sign each swap, record withdrawal</button>
+          <p class="badge">API: POST /buckets/:id/sell/jupiter-plan → sign N txs on ${escapeHtml(SOLANA_JUPITER_RPC)} → POST /buckets/:id/sell/jupiter-complete</p>
+          ${
+            !isMainnetServer()
+              ? `<p class="err">Server is in <strong>${escapeHtml(state.serverInfo?.network ?? "unknown")}</strong> mode — Jupiter sell is mainnet only.</p>`
+              : ""
+          }
+        </div>
+        ${
+          state.serverInfo?.network === "devnet"
+            ? `<div class="panel">
+                <h2>Devnet helpers</h2>
+                <p class="badge">GET /devnet/airdrop?address=&amp;amount= — public Solana devnet faucet (rate-limited).</p>
+                <button class="ghost" type="button" id="btn-devnet-airdrop" ${state.address ? "" : "disabled"}>Airdrop 1 devnet SOL to my wallet</button>
+              </div>`
+            : ""
+        }
+      </div>`
+        : state.tab === "marketplace"
         ? `
       <div class="grid2">
         <div class="panel">
@@ -924,25 +1287,55 @@ function render() {
           <h2>Detail & invest</h2>
           <button class="ghost" type="button" id="btn-load-detail">Load selected / draft id</button>
           <pre class="log">${escapeHtml(JSON.stringify(state.bucketDetail, null, 2))}</pre>
-          <form id="form-invest">
-            <label>Protocol treasury (base58)</label>
-            <input id="invest-treasury" class="mono" placeholder="Must match server INVEST_TREASURY_PUBKEY" value="${escapeAttr(defaultInvestTreasuryField())}" autocomplete="off" />
-            <p class="badge">Saved in this browser after you invest or change the field. Server must use the same address or verification fails.</p>
+          ${
+            state.serverInfo?.treasuryInvestEnabled
+              ? `<form id="form-invest">
+            ${
+              serverTreasury()
+                ? `<label>Protocol treasury (devnet demo)</label>
+                   <div class="badge mono" style="user-select:all">${escapeHtml(serverTreasury())}</div>
+                   <p class="badge">Devnet-only path. Investor wallet signs the SOL transfer; server verifies the recipient.</p>`
+                : `<label>Protocol treasury (base58) — server did not advertise one</label>
+                   <input id="invest-treasury" class="mono" placeholder="Must match server INVEST_TREASURY_PUBKEY" value="${escapeAttr(defaultInvestTreasuryField())}" autocomplete="off" />
+                   <p class="badge">Server is not exposing a treasury — set INVEST_TREASURY_PUBKEY on the server and reload, or paste it once here. Saved in this browser.</p>`
+            }
             <label>Bucket id</label>
             <input id="invest-bucket-id" value="${escapeAttr(state.draftBucketId)}" />
             <label>Amount (gross SOL sent on-chain; fee split applied when booking TVL)</label>
             <input id="invest-amount" type="number" step="any" min="0.000000001" value="${escapeAttr(state.lastInvestAmount)}" />
-            <button class="primary" type="submit" ${state.jwt && state.address ? "" : "disabled"}>Sign transfer & invest</button>
+            <button class="primary" type="submit" ${state.jwt && state.address ? "" : "disabled"}>Sign transfer & invest (devnet)</button>
           </form>
-          <p class="badge">Flow: wallet prompts for SOL transfer to treasury → server verifies tx on RPC → deposit recorded.</p>
-          <hr style="border-color:var(--border);margin:1.25rem 0" />
+          <p class="badge">Flow: wallet prompts for SOL transfer to treasury → server verifies tx on RPC → deposit recorded. Mainnet flows use Jupiter (below).</p>
+          <hr style="border-color:var(--border);margin:1.25rem 0" />`
+              : `<p class="badge">Mainnet mode: SOL→treasury invest disabled. Mainnet uses Jupiter — investor wallet swaps directly, tokens land in your wallet, no protocol custody.</p>
+              <input id="invest-bucket-id" value="${escapeAttr(state.draftBucketId)}" hidden />
+              <input id="invest-amount" type="hidden" value="${escapeAttr(state.lastInvestAmount)}" />`
+          }
           <h3>Jupiter basket (real allocation)</h3>
-          <p class="badge hint">Server calls Jupiter’s quote/swap API per listing, splits your SOL by bucket weights, returns unsigned transactions. You sign each swap — tokens land in <strong>your</strong> wallet. Use <strong>mainnet</strong> Phantom + funded wallet; devnet RPC will not confirm these swaps.</p>
-          <button class="primary" type="button" id="btn-jupiter-basket" ${state.jwt && state.address ? "" : "disabled"}>Build plan, sign each swap, record TVL</button>
+          <p class="badge hint">Server calls Jupiter’s quote/swap API per listing, splits your SOL by bucket weights, returns unsigned transactions. You sign each swap — tokens land in <strong>your</strong> wallet. ${
+            (state.serverInfo?.platformFeeBps ?? 0) > 0
+              ? `A platform fee of <strong>${(state.serverInfo!.platformFeeBps! / 100).toFixed(2)}%</strong> is signed as a separate SOL transfer.`
+              : ""
+          } Use <strong>mainnet</strong> Phantom + funded wallet; devnet RPC will not confirm these swaps.</p>
+          ${
+            !state.serverInfo?.treasuryInvestEnabled
+              ? `<label>Bucket id</label>
+                 <input id="invest-bucket-id-mainnet" class="mono" value="${escapeAttr(state.draftBucketId)}" oninput="document.getElementById('invest-bucket-id').value=this.value" />
+                 <label>SOL amount (split across listings)</label>
+                 <input id="invest-amount-mainnet" type="number" step="any" min="0.000000001" value="${escapeAttr(state.lastInvestAmount)}" oninput="document.getElementById('invest-amount').value=this.value" />`
+              : ""
+          }
+          <button class="primary" type="button" id="btn-jupiter-basket" ${state.jwt && state.address && isMainnetServer() ? "" : "disabled"}>Build plan, sign each swap, record TVL</button>
           <p class="badge">API: POST /buckets/:id/invest/jupiter-plan → sign N txs on ${escapeHtml(SOLANA_JUPITER_RPC)} → POST /buckets/:id/invest/jupiter-complete</p>
+          ${
+            !isMainnetServer()
+              ? `<p class="err">Server is in <strong>${escapeHtml(state.serverInfo?.network ?? "unknown")}</strong> mode — Jupiter buy is mainnet only.</p>`
+              : ""
+          }
         </div>
       </div>`
-        : `
+        : state.tab === "creator"
+        ? `
       <div class="panel">
         <h2>Create draft bucket</h2>
         <form id="form-bucket">
@@ -987,6 +1380,7 @@ function render() {
           </form>
         </details>
       </div>`
+        : ""
     }
 
     <div class="panel">
@@ -1005,10 +1399,12 @@ function render() {
   document.getElementById("btn-refresh-buckets")?.addEventListener("click", () => void refreshBuckets().then(render));
   document.querySelectorAll("[data-tab]").forEach((el) => {
     el.addEventListener("click", () => {
-      state.tab = (el as HTMLElement).dataset.tab as "marketplace" | "creator";
+      state.tab = (el as HTMLElement).dataset.tab as "marketplace" | "creator" | "portfolio";
       const after = () => void refreshBuckets().then(render);
       if (state.tab === "creator") {
         void refreshCatalog().then(after);
+      } else if (state.tab === "portfolio") {
+        void refreshMyDeposits().then(after);
       } else {
         after();
       }
@@ -1066,6 +1462,11 @@ function render() {
         : `Selected weights should sum to <strong>100%</strong>.`;
   });
   document.getElementById("btn-publish")?.addEventListener("click", () => void publishDraft());
+  document.getElementById("btn-refresh-portfolio")?.addEventListener("click", () => void refreshMyDeposits().then(render));
+  document.getElementById("btn-load-position")?.addEventListener("click", () => void loadMyPosition());
+  document.getElementById("form-withdraw")?.addEventListener("submit", (ev) => void withdrawSubmit(ev));
+  document.getElementById("btn-jupiter-sell")?.addEventListener("click", () => void jupiterBasketSell());
+  document.getElementById("btn-devnet-airdrop")?.addEventListener("click", () => void devnetAirdrop());
 }
 
 function escapeHtml(s: string) {
@@ -1081,4 +1482,6 @@ function escapeAttr(s: string) {
 }
 
 render();
-void refreshCatalog().then(() => void refreshBuckets().then(render));
+void loadServerInfo().then(() =>
+  void refreshCatalog().then(() => void refreshBuckets().then(render))
+);

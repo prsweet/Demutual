@@ -47,6 +47,10 @@ model Withdrawal {
     bucket Bucket @relation(references: [id], fields: [bucketId])
     user User @relation(references: [id], fields: [userId])
     amount Decimal
+    /// First sell-leg signature when sell goes through Jupiter (mainnet); null for ledger-only withdrawals.
+    transactionSignature String? @unique
+    /// All Jupiter sell leg signatures, in plan order.
+    jupiterLegSignatures Json?
     createdAt DateTime @default(now())
 
     @@map("Withdawal")

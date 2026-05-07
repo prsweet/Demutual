@@ -48,10 +48,34 @@ export type jupiterInvestPlanSchema = Static<typeof jupiterInvestPlanSchema>;
 /** After the investor signs & sends each swap tx, record the round-trip. */
 export const jupiterInvestCompleteSchema = t.Object({
   solAmount: t.Number({ exclusiveMinimum: 0 }),
-  transactionSignatures: t.Array(t.String({ minLength: 32, maxLength: 128 }), { minItems: 1 })
+  transactionSignatures: t.Array(t.String({ minLength: 32, maxLength: 128 }), { minItems: 1 }),
+  /** Required iff the plan returned a `feeTransfer` and PLATFORM_FEE_WALLET_PUBKEY is configured. */
+  feeTransferSignature: t.Optional(t.String({ minLength: 32, maxLength: 128 }))
 });
 
 export type jupiterInvestCompleteSchema = Static<typeof jupiterInvestCompleteSchema>;
+
+/** Sell side mirrors the buy: per-listing ExactOut quotes (asset → SOL) sized by withdrawal amount. */
+export const jupiterSellPlanSchema = t.Object({
+  solAmount: t.Number({ exclusiveMinimum: 0 }),
+  slippageBps: t.Optional(t.Number({ minimum: 1, maximum: 5000 }))
+});
+
+export type jupiterSellPlanSchema = Static<typeof jupiterSellPlanSchema>;
+
+export const jupiterSellCompleteSchema = t.Object({
+  solAmount: t.Number({ exclusiveMinimum: 0 }),
+  transactionSignatures: t.Array(t.String({ minLength: 32, maxLength: 128 }), { minItems: 1 }),
+  feeTransferSignature: t.Optional(t.String({ minLength: 32, maxLength: 128 }))
+});
+
+export type jupiterSellCompleteSchema = Static<typeof jupiterSellCompleteSchema>;
+
+export const withdrawBucketSchema = t.Object({
+  amount: t.Number({ exclusiveMinimum: 0 })
+});
+
+export type withdrawBucketSchema = Static<typeof withdrawBucketSchema>;
 
 export const addBucketAssetsSchema = t.Object({
   assets: t.Array(
@@ -126,5 +150,15 @@ export const errors = {
   investTxVerify400: "INVEST_TX_VERIFICATION_FAILED",
   investTxDuplicate409: "INVEST_TX_ALREADY_RECORDED",
   jupiterPlan400: "JUPITER_PLAN_FAILED",
-  jupiterNothingToSwap400: "JUPITER_NOTHING_TO_SWAP"
+  jupiterNothingToSwap400: "JUPITER_NOTHING_TO_SWAP",
+  jupiterDevnetUnsupported400: "JUPITER_NOT_AVAILABLE_ON_DEVNET",
+  jupiterSellPlan400: "JUPITER_SELL_PLAN_FAILED",
+  jupiterSellNothingToSwap400: "JUPITER_SELL_NOTHING_TO_SWAP",
+  sellTxDuplicate409: "SELL_TX_ALREADY_RECORDED",
+  treasuryInvestDevnetOnly400: "TREASURY_INVEST_DEVNET_ONLY",
+  feeTransferRequired400: "FEE_TRANSFER_SIGNATURE_REQUIRED",
+  feeTransferVerify400: "FEE_TRANSFER_VERIFICATION_FAILED",
+  creatorWalletMissing400: "CREATOR_WALLET_MISSING",
+  withdrawInsufficient400: "WITHDRAW_EXCEEDS_POSITION",
+  withdrawBucketNotPublished400: "WITHDRAW_BUCKET_NOT_PUBLISHED"
 }

@@ -1,6 +1,5 @@
 import { status, type Context } from "elysia";
 import {
-  anyFeeActive,
   creatorFeeBps,
   isDevnet,
   platformFeeActive,
@@ -13,39 +12,43 @@ import { toJsonSafe } from "../jsonSafe";
 import { jupiterGetQuote, jupiterPostSwap, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
-  type jupiterInvestCompleteSchema,
-  type jupiterInvestPlanSchema,
+  type jupiterSellCompleteSchema,
+  type jupiterSellPlanSchema,
   response,
   type decoratedContext
 } from "../types";
 
-type PlanLeg =
+type SellLeg =
   | {
       kind: "swap";
-      outputMint: string;
+      inputMint: string;
       symbol: string;
       percentage: number;
-      inputLamports: number;
+      /** Lamports of SOL this leg should produce (ExactOut target). */
+      outputLamports: number;
+      /** Estimated input amount in the asset's base units, from Jupiter. */
+      estInputAmount: string;
       swapTransactionBase64: string;
     }
   | {
       kind: "noop";
-      outputMint: string;
+      inputMint: string;
       symbol: string;
       percentage: number;
-      inputLamports: number;
+      outputLamports: number;
       reason: string;
     };
 
 /**
- * Returns one unsigned swap transaction per listing (SOL → asset), sized by bucket weights.
- * Investor must sign & send each tx on the same cluster Jupiter targeted (usually mainnet).
+ * Builds one Jupiter `ExactOut` swap per listing (asset → SOL) sized so that the sum
+ * of leg outputs equals the requested `solAmount`. Investor signs each tx; SOL lands
+ * in their wallet. Withdrawal is recorded only after `complete`.
  */
-const buildJupiterPlan = async ({
+const buildJupiterSellPlan = async ({
   params,
   userId,
   body
-}: decoratedContext<Context<{ params: { id: string }; body: jupiterInvestPlanSchema }>>) => {
+}: decoratedContext<Context<{ params: { id: string }; body: jupiterSellPlanSchema }>>) => {
   try {
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
     if (isDevnet()) {
@@ -63,13 +66,13 @@ const buildJupiterPlan = async ({
       return status(400, response(false, null, errors.typeBox400));
     }
 
-    let totalLamportsBig: bigint;
+    let totalLamports: bigint;
     try {
-      totalLamportsBig = grossLamportsFromSol(gross);
+      totalLamports = grossLamportsFromSol(gross);
     } catch {
       return status(400, response(false, null, errors.typeBox400));
     }
-    const grossLamports = Number(totalLamportsBig);
+    const total = Number(totalLamports);
 
     const bucket = await prisma.bucket.findUnique({
       where: { id: params.id },
@@ -83,15 +86,21 @@ const buildJupiterPlan = async ({
       return status(400, response(false, null, errors.bucketNotPublished400));
     }
 
-    const platBps = platformFeeBps();
-    const platWallet = platformFeeWallet();
-    const creatorBps = creatorFeeBps();
-    const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
-
-    const platLamports = platformFeeActive() ? Math.floor((grossLamports * platBps) / 10000) : 0;
-    const creatorLamports =
-      creatorBps > 0 && creatorWallet ? Math.floor((grossLamports * creatorBps) / 10000) : 0;
-    const swapLamports = grossLamports - platLamports - creatorLamports;
+    const [depAgg, witAgg] = await Promise.all([
+      prisma.deposit.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      }),
+      prisma.withdrawal.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      })
+    ]);
+    const available =
+      Number(depAgg._sum.amount ?? 0) - Number(witAgg._sum.amount ?? 0);
+    if (gross > available + 1e-9) {
+      return status(400, response(false, null, errors.withdrawInsufficient400));
+    }
 
     const listings = [...bucket.listing].sort((a, b) =>
       (a.asset?.symbol ?? "").localeCompare(b.asset?.symbol ?? "")
@@ -101,62 +110,73 @@ const buildJupiterPlan = async ({
     }
 
     const slippageBps = body.slippageBps ?? 80;
-    const legs: PlanLeg[] = [];
+    const legs: SellLeg[] = [];
     let allocated = 0;
     const n = listings.length;
 
     for (let i = 0; i < n; i++) {
       const row = listings[i]!;
       const pct = Number(row.percentage);
-      const lamports = i === n - 1 ? swapLamports - allocated : Math.floor((swapLamports * pct) / 100);
-      allocated += lamports;
+      const outLamports =
+        i === n - 1 ? total - allocated : Math.floor((total * pct) / 100);
+      allocated += outLamports;
 
-      if (lamports <= 0) continue;
+      if (outLamports <= 0) continue;
 
-      const outMint = row.assetId;
+      const inMint = row.assetId;
       const symbol = row.asset?.symbol ?? "?";
 
-      if (outMint === WSOL_MINT) {
+      if (inMint === WSOL_MINT) {
         legs.push({
           kind: "noop",
-          outputMint: outMint,
+          inputMint: inMint,
           symbol,
           percentage: pct,
-          inputLamports: lamports,
-          reason: "Target is SOL; no Jupiter swap needed."
+          outputLamports: outLamports,
+          reason: "Source is SOL; user already holds it — no Jupiter swap needed."
         });
         continue;
       }
 
       try {
-        const quote = await jupiterGetQuote({
-          inputMint: WSOL_MINT,
-          outputMint: outMint,
-          amountLamports: lamports,
-          slippageBps
-        });
+        const quote = (await jupiterGetQuote({
+          inputMint: inMint,
+          outputMint: WSOL_MINT,
+          amountLamports: outLamports,
+          slippageBps,
+          swapMode: "ExactOut"
+        })) as { inAmount?: string };
         const { swapTransaction } = await jupiterPostSwap({
           quoteResponse: quote,
           userPublicKey: user.walletAddress
         });
         legs.push({
           kind: "swap",
-          outputMint: outMint,
+          inputMint: inMint,
           symbol,
           percentage: pct,
-          inputLamports: lamports,
+          outputLamports: outLamports,
+          estInputAmount: String(quote.inAmount ?? "?"),
           swapTransactionBase64: swapTransaction
         });
       } catch (e) {
-        console.error("[buildJupiterPlan leg]", outMint, e);
-        return status(400, response(false, null, errors.jupiterPlan400));
+        console.error("[buildJupiterSellPlan leg]", inMint, e);
+        return status(400, response(false, null, errors.jupiterSellPlan400));
       }
     }
 
     const swapCount = legs.filter((l) => l.kind === "swap").length;
     if (swapCount === 0) {
-      return status(400, response(false, null, errors.jupiterNothingToSwap400));
+      return status(400, response(false, null, errors.jupiterSellNothingToSwap400));
     }
+
+    const platBps = platformFeeBps();
+    const platWallet = platformFeeWallet();
+    const creatorBps = creatorFeeBps();
+    const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
+    const platLamports = platformFeeActive() ? Math.floor((total * platBps) / 10000) : 0;
+    const creatorLamports =
+      creatorBps > 0 && creatorWallet ? Math.floor((total * creatorBps) / 10000) : 0;
 
     return status(
       200,
@@ -164,8 +184,8 @@ const buildJupiterPlan = async ({
         true,
         toJsonSafe({
           bucketId: bucket.id,
-          inputMint: WSOL_MINT,
-          grossSol: gross,
+          outputMint: WSOL_MINT,
+          targetSol: gross,
           userWallet: user.walletAddress,
           slippageBps,
           legs,
@@ -196,27 +216,26 @@ const buildJupiterPlan = async ({
                       : [])
                   ],
                   reason:
-                    "Investor-signed SOL transfer with both fee splits in ONE tx. Send BEFORE the swap legs and pass its signature to /invest/jupiter-complete."
+                    "Investor-signed SOL transfer with platform + creator splits in ONE tx. Send AFTER the swap legs land SOL in your wallet, then pass its signature to /sell/jupiter-complete."
                 }
               : null,
           note:
-            "Sign feeTransfer (if present) first, then sign and send each swap leg with the same wallet. Devnet RPC will not match Jupiter mainnet routes."
+            "ExactOut quotes: each swap pulls the asset from your wallet and lands SOL. Sign and send each leg, then send the feeTransfer (if present), then call /sell/jupiter-complete with both."
         }),
         null
       )
     );
   } catch (e) {
-    console.error("[buildJupiterPlan]", e);
+    console.error("[buildJupiterSellPlan]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
 
-/** Book TVL after successful on-chain swaps (MVP: does not re-parse swap amounts from chain). */
-const completeJupiterInvest = async ({
+const completeJupiterSell = async ({
   params,
   userId,
   body
-}: decoratedContext<Context<{ params: { id: string }; body: jupiterInvestCompleteSchema }>>) => {
+}: decoratedContext<Context<{ params: { id: string }; body: jupiterSellCompleteSchema }>>) => {
   try {
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
     if (isDevnet()) {
@@ -234,12 +253,12 @@ const completeJupiterInvest = async ({
     }
     const feeSig = body.feeTransferSignature?.trim();
 
-    const dup = await prisma.deposit.findUnique({
+    const dup = await prisma.withdrawal.findUnique({
       where: { transactionSignature: sigs[0] },
       select: { id: true }
     });
     if (dup) {
-      return status(409, response(false, null, errors.investTxDuplicate409));
+      return status(409, response(false, null, errors.sellTxDuplicate409));
     }
 
     const bucket = await prisma.bucket.findUnique({
@@ -248,7 +267,7 @@ const completeJupiterInvest = async ({
     });
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
     if (bucket.type !== "PUBLISHED") {
-      return status(400, response(false, null, errors.bucketNotPublished400));
+      return status(400, response(false, null, errors.withdrawBucketNotPublished400));
     }
 
     const user = await prisma.user.findUnique({
@@ -257,15 +276,30 @@ const completeJupiterInvest = async ({
     });
     if (!user) return status(401, response(false, null, errors.unauthorized401));
 
+    const [depAgg, witAgg] = await Promise.all([
+      prisma.deposit.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      }),
+      prisma.withdrawal.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      })
+    ]);
+    const available =
+      Number(depAgg._sum.amount ?? 0) - Number(witAgg._sum.amount ?? 0);
+    if (gross > available + 1e-9) {
+      return status(400, response(false, null, errors.withdrawInsufficient400));
+    }
+
+    const platBps = platformFeeBps();
+    const platWallet = platformFeeWallet();
+    const creatorBps = creatorFeeBps();
     const bucketCreator = await prisma.bucket.findUnique({
       where: { id: params.id },
       select: { creator: { select: { walletAddress: true } } }
     });
     const creatorWallet = bucketCreator?.creator?.walletAddress?.trim() || null;
-
-    const platBps = platformFeeBps();
-    const platWallet = platformFeeWallet();
-    const creatorBps = creatorFeeBps();
     const grossLamports = Number(grossLamportsFromSol(gross));
     const expectedPlat = platformFeeActive() ? Math.floor((grossLamports * platBps) / 10000) : 0;
     const expectedCreator =
@@ -292,32 +326,27 @@ const completeJupiterInvest = async ({
           expectedTransfers
         });
       } catch (e) {
-        console.error("[completeJupiterInvest fee verify]", e);
+        console.error("[completeJupiterSell fee verify]", e);
         return status(400, response(false, null, errors.feeTransferVerify400));
       }
     }
 
-    const feePlatformSol = expectedPlat / 1e9;
-    const feeCreatorSol = expectedCreator / 1e9;
-    const net = gross - feePlatformSol - feeCreatorSol;
-
     const result = await prisma.$transaction(async (tx) => {
-      const deposit = await tx.deposit.create({
+      const withdrawal = await tx.withdrawal.create({
         data: {
           bucketId: bucket.id,
           userId,
-          amount: net,
-          feeCreator: feeCreatorSol,
-          feePlatform: feePlatformSol,
+          amount: gross,
           transactionSignature: sigs[0]!,
           jupiterLegSignatures: sigs as unknown as object
         }
       });
-      const bucketUpdate = await tx.bucket.update({
+      const newTvl = Math.max(0, Number(bucket.tvl) - gross);
+      const b = await tx.bucket.update({
         where: { id: bucket.id },
-        data: { tvl: Number(bucket.tvl) + net }
+        data: { tvl: newTvl }
       });
-      return { deposit, bucketUpdate };
+      return { withdrawal, bucket: b };
     });
 
     return status(
@@ -325,19 +354,11 @@ const completeJupiterInvest = async ({
       response(
         true,
         toJsonSafe({
-          message: "Jupiter basket invest recorded",
-          deposit: result.deposit,
-          bucket: result.bucketUpdate,
+          message: "Jupiter basket sell recorded",
+          withdrawal: result.withdrawal,
+          bucket: result.bucket,
           transactionSignatures: sigs,
-          feeTransferSignature: feeSig ?? null,
-          breakdown: {
-            grossAmount: gross,
-            platformFeeBps: platBps,
-            creatorFeeBps: creatorBps,
-            platformFeeSol: feePlatformSol,
-            creatorFeeSol: feeCreatorSol,
-            netToPool: net
-          }
+          feeTransferSignature: feeSig ?? null
         }),
         null
       )
@@ -345,14 +366,14 @@ const completeJupiterInvest = async ({
   } catch (e) {
     const code = e && typeof e === "object" && "code" in e ? (e as { code: string }).code : "";
     if (code === "P2002") {
-      return status(409, response(false, null, errors.investTxDuplicate409));
+      return status(409, response(false, null, errors.sellTxDuplicate409));
     }
-    console.error("[completeJupiterInvest]", e);
+    console.error("[completeJupiterSell]", e);
     return status(500, response(false, null, errors.serverError500));
   }
 };
 
-export const jupiterInvestControllers = {
-  buildJupiterPlan,
-  completeJupiterInvest
+export const jupiterSellControllers = {
+  buildJupiterSellPlan,
+  completeJupiterSell
 };

@@ -19,14 +19,17 @@ export type JupiterQuoteResponse = Record<string, unknown>;
 export async function jupiterGetQuote(params: {
   inputMint: string;
   outputMint: string;
+  /** Lamports/base-units. For ExactIn this is input amount; for ExactOut this is required output amount. */
   amountLamports: number;
   slippageBps: number;
+  swapMode?: "ExactIn" | "ExactOut";
 }): Promise<JupiterQuoteResponse> {
   const u = new URL(`${jupiterHost()}/v6/quote`);
   u.searchParams.set("inputMint", params.inputMint);
   u.searchParams.set("outputMint", params.outputMint);
   u.searchParams.set("amount", String(params.amountLamports));
   u.searchParams.set("slippageBps", String(params.slippageBps));
+  if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
 
   const headers: Record<string, string> = { Accept: "application/json" };
   const key = process.env.JUPITER_API_KEY?.trim();

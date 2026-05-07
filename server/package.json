@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "bun run src/index.ts --hot",
     "start": "bun run src/index.ts",
+    "test": "bun test",
     "db:generate": "prisma generate --schema src/prisma/schema.prisma",
     "db:push": "prisma db push --schema src/prisma/schema.prisma"
   },

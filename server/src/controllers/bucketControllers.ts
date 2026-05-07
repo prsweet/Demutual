@@ -1,4 +1,5 @@
 import { status, type Context } from "elysia";
+import { isDevnet } from "../config";
 import { TOKEN_CATALOG_BY_ID } from "../constants/tokenCatalog";
 import { INVEST_PROTOCOL_FEE_RATE } from "../constants/fees";
 import { prisma } from "../db";
@@ -11,7 +12,8 @@ import {
   investInBucketSchema,
   listBucketsQuerySchema,
   response,
-  type decoratedContext
+  type decoratedContext,
+  type withdrawBucketSchema
 } from "../types";
 
 const getAllBuckets = async ({
@@ -113,6 +115,9 @@ const investInBucket = async ({
 >) => {
   try {
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
+    if (!isDevnet()) {
+      return status(400, response(false, null, errors.treasuryInvestDevnetOnly400));
+    }
 
     const rpcUrl = process.env.SOLANA_RPC_URL?.trim();
     const treasuryPk = process.env.INVEST_TREASURY_PUBKEY?.trim();
@@ -348,6 +353,131 @@ const publishBucket = async ({
   }
 };
 
+const getMyBucketPosition = async ({
+  params,
+  userId
+}: decoratedContext<Context<{ params: { id: string } }>>) => {
+  try {
+    if (!userId) return status(401, response(false, null, errors.unauthorized401));
+
+    const bucket = await prisma.bucket.findUnique({
+      where: { id: params.id },
+      select: { id: true, type: true, name: true }
+    });
+    if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+
+    const [depAgg, witAgg] = await Promise.all([
+      prisma.deposit.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      }),
+      prisma.withdrawal.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      })
+    ]);
+
+    const deposited = Number(depAgg._sum.amount ?? 0);
+    const withdrawn = Number(witAgg._sum.amount ?? 0);
+    const available = Math.max(0, deposited - withdrawn);
+
+    return status(
+      200,
+      response(
+        true,
+        toJsonSafe({
+          bucketId: bucket.id,
+          bucketName: bucket.name,
+          bucketType: bucket.type,
+          totalDeposited: deposited,
+          totalWithdrawn: withdrawn,
+          availableToWithdraw: available
+        }),
+        null
+      )
+    );
+  } catch (e) {
+    console.error("[getMyBucketPosition]", e);
+    return status(500, response(false, null, errors.serverError500));
+  }
+};
+
+const withdrawFromBucket = async ({
+  params,
+  userId,
+  body
+}: decoratedContext<Context<{ params: { id: string }; body: withdrawBucketSchema }>>) => {
+  try {
+    if (!userId) return status(401, response(false, null, errors.unauthorized401));
+
+    const amt = Number(body.amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return status(400, response(false, null, errors.typeBox400));
+    }
+
+    const bucket = await prisma.bucket.findUnique({
+      where: { id: params.id },
+      select: { id: true, tvl: true, type: true }
+    });
+    if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+    if (bucket.type !== "PUBLISHED") {
+      return status(400, response(false, null, errors.withdrawBucketNotPublished400));
+    }
+
+    const [depAgg, witAgg] = await Promise.all([
+      prisma.deposit.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      }),
+      prisma.withdrawal.aggregate({
+        where: { userId, bucketId: params.id },
+        _sum: { amount: true }
+      })
+    ]);
+
+    const deposited = Number(depAgg._sum.amount ?? 0);
+    const withdrawn = Number(witAgg._sum.amount ?? 0);
+    const available = Math.max(0, deposited - withdrawn);
+
+    if (amt > available) {
+      return status(400, response(false, null, errors.withdrawInsufficient400));
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const withdrawal = await tx.withdrawal.create({
+        data: {
+          bucketId: bucket.id,
+          userId,
+          amount: amt
+        }
+      });
+      const currentTvl = Number(bucket.tvl);
+      const newTvl = Math.max(0, currentTvl - amt);
+      const b = await tx.bucket.update({
+        where: { id: bucket.id },
+        data: { tvl: newTvl }
+      });
+      return { withdrawal, bucket: b };
+    });
+
+    return status(
+      201,
+      response(
+        true,
+        toJsonSafe({
+          message:
+            "Withdrawal recorded in Demutual ledger (off-chain accounting). Wire real token/SOL payouts via your custody or program.",
+          ...result
+        }),
+        null
+      )
+    );
+  } catch (e) {
+    console.error("[withdrawFromBucket]", e);
+    return status(500, response(false, null, errors.serverError500));
+  }
+};
+
 const forkBucketVersion = async ({
   params,
   userId
@@ -412,7 +542,9 @@ export const bucketControllers = {
   getAllBuckets,
   createBucket,
   getBucketById,
+  getMyBucketPosition,
   investInBucket,
+  withdrawFromBucket,
   addBucketAssets,
   publishBucket,
   forkBucketVersion

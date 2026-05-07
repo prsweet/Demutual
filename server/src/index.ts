@@ -1,10 +1,14 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
+import { API_ROUTE_MANIFEST } from "./constants/apiManifest";
+import { corsOrigins, publicServiceInfo, serverPort } from "./config";
 import { prisma } from "./db";
 import { authRoutes } from "./routes/authRoutes";
 import { assetRoutes } from "./routes/assetRoutes";
-import { errors, response } from "./types";
 import { bucketRoutes } from "./routes/bucketRoutes";
+import { devnetRoutes } from "./routes/devnetRoutes";
+import { userRoutes } from "./routes/userRoutes";
+import { errors, response } from "./types";
 
 async function bootstrap() {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -33,12 +37,26 @@ async function bootstrap() {
   }
 
   new Elysia()
-    .get("/", () => status(200, response(true, { service: "demutual-api", health: "/health", auth: "/auth", buckets: "/buckets" }, null)))
+    .get("/", () =>
+      status(
+        200,
+        response(
+          true,
+          {
+            service: "demutual-api",
+            health: "/health",
+            routes: API_ROUTE_MANIFEST,
+            config: publicServiceInfo()
+          },
+          null
+        )
+      )
+    )
     .get("/favicon.ico", () => new Response(null, { status: 204 }))
     .get("/health", async () => {
       try {
         await prisma.$queryRaw`SELECT 1`;
-        return status(200, response(true, { ok: true }, null));
+        return status(200, response(true, { ok: true, ...publicServiceInfo() }, null));
       } catch (e) {
         console.error("[health]", e);
         return status(503, response(false, null, errors.serverError500));
@@ -46,11 +64,7 @@ async function bootstrap() {
     })
     .use(
       cors({
-        origin: [
-          /^https?:\/\/localhost(?::\d+)?$/,
-          /^https?:\/\/127\.0\.0\.1(?::\d+)?$/,
-          /^https?:\/\/\[::1\](?::\d+)?$/
-        ],
+        origin: corsOrigins(),
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization"]
       })
@@ -64,9 +78,13 @@ async function bootstrap() {
       return status(500, response(false, null, errors.serverError500));
     })
     .use(authRoutes)
+    .use(userRoutes)
     .use(assetRoutes)
     .use(bucketRoutes)
-    .listen(3000, () => console.log("Demutual API listening on http://localhost:3000 (GET /health)"));
+    .use(devnetRoutes)
+    .listen(serverPort(), () =>
+      console.log(`Demutual API listening on http://localhost:${serverPort()} (GET /health)`)
+    );
 }
 
 void bootstrap();
