@@ -1,24 +1,43 @@
 import Elysia from "elysia";
 import { bucketControllers } from "../controllers/bucketControllers";
 import { authMiddlewares } from "../middlewares/auth";
-import { createBucketSchema } from "../types";
+import {
+  addBucketAssetsSchema,
+  createBucketSchema,
+  investInBucketSchema,
+  listBucketsQuerySchema
+} from "../types";
 
 export const bucketRoutes = new Elysia();
 
-bucketRoutes.group('/buckets', app => {
-  app.get('/', bucketControllers.getAllBuckets);
-  app.get('/:id', bucketControllers.getBucketById);
-  app.get('/:id/performance', bucketControllers.getBucketById);
-  app.group('/', app => {
-    app.onBeforeHandle(authMiddlewares.requireAuth);
-    app.post('/', bucketControllers.createBucket, { body: createBucketSchema });
-    app.post('/:id/invest', bucketControllers.getBucketById);
-    app.group('/creator', app => {
-      app.onBeforeHandle(authMiddlewares.requireBucketCreator);
-      // there will be other routes relateed to creator for bucket seeing and all
-      return app;
-    })
-    return app;
+bucketRoutes.group("/buckets", (app) => {
+  app.get("/", bucketControllers.getAllBuckets, { query: listBucketsQuerySchema });
+  app.get("/:id", bucketControllers.getBucketById);
+
+  app.group("/", (authApp) => {
+    authApp.onBeforeHandle(authMiddlewares.requireAuth);
+    authApp.post("/", bucketControllers.createBucket, { body: createBucketSchema });
+
+    authApp.group("/:id", (idApp) => {
+      idApp.post("/invest", bucketControllers.investInBucket, {
+        body: investInBucketSchema
+      });
+
+      idApp.group("/creator", (creatorApp) => {
+        creatorApp.onBeforeHandle(authMiddlewares.requireBucketCreator);
+        creatorApp.post("/assets", bucketControllers.addBucketAssets, {
+          body: addBucketAssetsSchema
+        });
+        creatorApp.post("/publish", bucketControllers.publishBucket);
+        creatorApp.post("/versions", bucketControllers.forkBucketVersion);
+        return creatorApp;
+      });
+
+      return idApp;
+    });
+
+    return authApp;
   });
+
   return app;
 });

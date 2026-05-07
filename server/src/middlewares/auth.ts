@@ -1,4 +1,4 @@
-import Elysia, { status, type Context } from "elysia";
+import { status, type Context } from "elysia";
 import { verify, type JwtPayload } from "jsonwebtoken";
 import { errors, response, type decoratedContext } from "../types";
 import { prisma } from "../db";
@@ -13,10 +13,16 @@ const requireAuth = async (ctx: decoratedContext<Context>) => {
   }
 }
 
-const requireBucketCreator = async ({ userId }: decoratedContext<Context>) => {
-  const creator = await prisma.bucket.findFirst({ where: { creatorId: userId } });
-  if (!creator) return status(403, response(false, null, errors.bucketCreator403));
-}
+const requireBucketCreator = async (
+  ctx: decoratedContext<Context<{ params: { id: string } }>>
+) => {
+  if (!ctx.userId) return status(401, response(false, null, errors.unauthorized401));
+  const bucket = await prisma.bucket.findUnique({ where: { id: ctx.params.id } });
+  if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+  if (bucket.creatorId !== ctx.userId) {
+    return status(403, response(false, null, errors.bucketCreator403));
+  }
+};
 
 export const authMiddlewares = {
   requireAuth,

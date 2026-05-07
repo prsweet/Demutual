@@ -1,5 +1,5 @@
 import { status, type Context } from "elysia";
-import { errors, response, walletAuthSchema, nonceCreateSchema, type decoratedContext } from "../types";
+import { errors, nonceCreateSchema, response, walletAuthSchema, type decoratedContext } from "../types";
 import { prisma } from "../db";
 import { sign } from "jsonwebtoken";
 import { address, getBase58Codec, getPublicKeyFromAddress, getUtf8Codec, isSignatureBytes, verifySignature } from "@solana/kit";
@@ -31,10 +31,13 @@ const walletLogin = async ({ body, set }: decoratedContext<Context<{ body: walle
     where: { walletAddress: body.address }
   });
   if (!logingUser) {
-    const username = body.username as string;
+    const username = body.username?.trim();
+    if (!username) {
+      return status(400, response(false, null, errors.typeBox400));
+    }
     set.status = 201;
     logingUser = await prisma.user.create({
-      data: { walletAddress: body.address, username: username }
+      data: { walletAddress: body.address, username }
     });
   }
 
@@ -42,7 +45,7 @@ const walletLogin = async ({ body, set }: decoratedContext<Context<{ body: walle
   return response(true, { token }, null);
 };
 
-const getNonce = async ({ query }: decoratedContext<Context<{ query: nonceCreateSchema}>>) => {
+const getNonce = async ({ query }: decoratedContext<Context<{ query: nonceCreateSchema }>>) => {
   const nonce = await prisma.nonce.create({
     data: {
       walletAddress: query.address,
