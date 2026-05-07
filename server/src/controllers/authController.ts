@@ -1,5 +1,5 @@
 import { status, type Context } from "elysia";
-import { errors, response, walletAuthSchema } from "../types";
+import { errors, response, walletAuthSchema, nonceCreateSchema } from "../types";
 import { prisma } from "../db";
 import { sign } from "jsonwebtoken";
 import { address, getBase58Codec, getPublicKeyFromAddress, getUtf8Codec, isSignatureBytes, verifySignature } from "@solana/kit";
@@ -7,10 +7,10 @@ import { address, getBase58Codec, getPublicKeyFromAddress, getUtf8Codec, isSigna
 const walletLogin = async ({ body, set }: Context<{ body: walletAuthSchema }>) => {
   const nonceRecorded = await prisma.nonce.findFirst({
     where: {
-      wallet_address: body.address,
+      walletAddress: body.address,
       value: body.details.nonce,
       used: false,
-      expires_at: { gte: new Date() }
+      expiresAt: { gte: new Date() },
     }
   });
   if (!nonceRecorded) return status(402, response(false, null, errors.nonce402));
@@ -28,19 +28,38 @@ const walletLogin = async ({ body, set }: Context<{ body: walletAuthSchema }>) =
   });
   
   let logingUser = await prisma.user.findFirst({
-    where: { wallet_address: body.address }
+    where: { walletAddress: body.address }
   });
   if (!logingUser) {
+    const username = body.username as string;
     set.status = 201;
     logingUser = await prisma.user.create({
-      data: { wallet_address: body.address }
+      data: { walletAddress: body.address, username: username }
     });
   }
 
-  const token = sign({ userId: logingUser.id, }, process.env.JWT_SECRET!);
+  const token = sign({ userId: logingUser.id }, process.env.JWT_SECRET!);
   return response(true, { token }, null);
+};
+
+const getNonce = async ({ query }: Context<{ query: nonceCreateSchema}>) => {
+  const nonce = await prisma.nonce.create({
+    data: {
+      walletAddress: query.address,
+      value: crypto.randomUUID(),
+      used: false,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    }
+  });
+  const nonceResponse = {
+    nonce: nonce.value,
+    message: `Login to Demutual: ${nonce.value}`,
+    expiresAt: nonce.expiresAt
+  }
+  return status(200, response(true, nonceResponse, null));
 }
 
 export const authControllers = {
-  walletLogin
+  walletLogin,
+  getNonce
 }
