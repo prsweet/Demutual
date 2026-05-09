@@ -570,10 +570,10 @@ async function refreshBuckets() {
     const uid = userIdFromJwt();
     if (uid) path = `/buckets?creatorId=${encodeURIComponent(uid)}`;
   }
-  const res = await api<Record<string, unknown>[]>(path);
+  const res = await api<{ data: Record<string, unknown>[] }>(path);
   if (res.success) {
-    state.buckets = res.data;
-    log(`Listed buckets (${path})`, res.data.length);
+    state.buckets = res.data.data;
+    log(`Listed buckets (${path})`, res.data.data.length);
   }
 }
 
