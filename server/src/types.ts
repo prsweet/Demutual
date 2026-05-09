@@ -89,11 +89,26 @@ export const addBucketAssetsSchema = t.Object({
 
 export type addBucketAssetsSchema = Static<typeof addBucketAssetsSchema>;
 
+export const idParamSchema = t.Object({
+  id: t.String()
+});
+
+export type idParamSchema = Static<typeof idParamSchema>;
+
+export const paginationQuerySchema = t.Object({
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+  offset: t.Optional(t.Numeric({ minimum: 0 }))
+});
+
+export type paginationQuerySchema = Static<typeof paginationQuerySchema>;
+
 export const listBucketsQuerySchema = t.Object({
   name: t.Optional(t.String()),
   creatorId: t.Optional(t.String()),
   /** Without creatorId, only PUBLISHED buckets are returned (marketplace). With creatorId, includes drafts unless status is set. */
-  status: t.Optional(t.Union([t.Literal("PUBLISHED"), t.Literal("DRAFT")]))
+  status: t.Optional(t.Union([t.Literal("PUBLISHED"), t.Literal("DRAFT")])),
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+  offset: t.Optional(t.Numeric({ minimum: 0 }))
 });
 
 export type listBucketsQuerySchema = Static<typeof listBucketsQuerySchema>;

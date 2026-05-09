@@ -26,6 +26,8 @@ type PlanLeg =
       symbol: string;
       percentage: number;
       inputLamports: number;
+      expectedOutAmount: string;
+      minimumOutAmount: string;
       swapTransactionBase64: string;
     }
   | {
@@ -58,18 +60,18 @@ const buildJupiterPlan = async ({
     });
     if (!user) return status(401, response(false, null, errors.unauthorized401));
 
-    const gross = Number(body.solAmount);
-    if (!Number.isFinite(gross) || gross <= 0) {
+    const netSwapSol = Number(body.solAmount);
+    if (!Number.isFinite(netSwapSol) || netSwapSol <= 0) {
       return status(400, response(false, null, errors.typeBox400));
     }
 
-    let totalLamportsBig: bigint;
+    let netSwapLamportsBig: bigint;
     try {
-      totalLamportsBig = grossLamportsFromSol(gross);
+      netSwapLamportsBig = grossLamportsFromSol(netSwapSol);
     } catch {
       return status(400, response(false, null, errors.typeBox400));
     }
-    const grossLamports = Number(totalLamportsBig);
+    const swapLamports = Number(netSwapLamportsBig);
 
     const bucket = await prisma.bucket.findUnique({
       where: { id: params.id },
@@ -88,10 +90,11 @@ const buildJupiterPlan = async ({
     const creatorBps = creatorFeeBps();
     const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
 
-    const platLamports = platformFeeActive() ? Math.floor((grossLamports * platBps) / 10000) : 0;
+    const platLamports = platformFeeActive() ? Math.floor((swapLamports * platBps) / 10000) : 0;
     const creatorLamports =
-      creatorBps > 0 && creatorWallet ? Math.floor((grossLamports * creatorBps) / 10000) : 0;
-    const swapLamports = grossLamports - platLamports - creatorLamports;
+      creatorBps > 0 && creatorWallet ? Math.floor((swapLamports * creatorBps) / 10000) : 0;
+    const grossLamports = swapLamports + platLamports + creatorLamports;
+    const gross = grossLamports / 1e9;
 
     const listings = [...bucket.listing].sort((a, b) =>
       (a.asset?.symbol ?? "").localeCompare(b.asset?.symbol ?? "")
@@ -135,6 +138,9 @@ const buildJupiterPlan = async ({
           amountLamports: lamports,
           slippageBps
         });
+        const expectedOutAmount = String((quote as any).outAmount || "0");
+        const minimumOutAmount = String((quote as any).otherAmountThreshold || "0");
+
         const { swapTransaction } = await jupiterPostSwap({
           quoteResponse: quote,
           userPublicKey: user.walletAddress
@@ -145,6 +151,8 @@ const buildJupiterPlan = async ({
           symbol,
           percentage: pct,
           inputLamports: lamports,
+          expectedOutAmount,
+          minimumOutAmount,
           swapTransactionBase64: swapTransaction
         });
       } catch (e) {
@@ -223,8 +231,8 @@ const completeJupiterInvest = async ({
       return status(400, response(false, null, errors.jupiterDevnetUnsupported400));
     }
 
-    const gross = Number(body.solAmount);
-    if (!Number.isFinite(gross) || gross <= 0) {
+    const netSwapSol = Number(body.solAmount);
+    if (!Number.isFinite(netSwapSol) || netSwapSol <= 0) {
       return status(400, response(false, null, errors.typeBox400));
     }
 
@@ -266,10 +274,10 @@ const completeJupiterInvest = async ({
     const platBps = platformFeeBps();
     const platWallet = platformFeeWallet();
     const creatorBps = creatorFeeBps();
-    const grossLamports = Number(grossLamportsFromSol(gross));
-    const expectedPlat = platformFeeActive() ? Math.floor((grossLamports * platBps) / 10000) : 0;
+    const swapLamports = Number(grossLamportsFromSol(netSwapSol));
+    const expectedPlat = platformFeeActive() ? Math.floor((swapLamports * platBps) / 10000) : 0;
     const expectedCreator =
-      creatorBps > 0 && creatorWallet ? Math.floor((grossLamports * creatorBps) / 10000) : 0;
+      creatorBps > 0 && creatorWallet ? Math.floor((swapLamports * creatorBps) / 10000) : 0;
     const expectedTransfers: { to: string; lamports: bigint }[] = [];
     if (expectedPlat > 0 && platWallet)
       expectedTransfers.push({ to: platWallet, lamports: BigInt(expectedPlat) });
@@ -299,7 +307,8 @@ const completeJupiterInvest = async ({
 
     const feePlatformSol = expectedPlat / 1e9;
     const feeCreatorSol = expectedCreator / 1e9;
-    const net = gross - feePlatformSol - feeCreatorSol;
+    const net = netSwapSol;
+    const totalGross = netSwapSol + feePlatformSol + feeCreatorSol;
 
     const result = await prisma.$transaction(async (tx) => {
       const deposit = await tx.deposit.create({
@@ -331,7 +340,7 @@ const completeJupiterInvest = async ({
           transactionSignatures: sigs,
           feeTransferSignature: feeSig ?? null,
           breakdown: {
-            grossAmount: gross,
+            grossAmount: totalGross,
             platformFeeBps: platBps,
             creatorFeeBps: creatorBps,
             platformFeeSol: feePlatformSol,

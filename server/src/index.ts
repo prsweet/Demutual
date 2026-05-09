@@ -9,6 +9,7 @@ import { bucketRoutes } from "./routes/bucketRoutes";
 import { devnetRoutes } from "./routes/devnetRoutes";
 import { userRoutes } from "./routes/userRoutes";
 import { errors, response } from "./types";
+import { authPlugin } from "./middlewares/auth";
 
 async function bootstrap() {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -77,6 +78,7 @@ async function bootstrap() {
       console.error("[elysia]", code, error);
       return status(500, response(false, null, errors.serverError500));
     })
+    .use(authPlugin)
     .use(authRoutes)
     .use(userRoutes)
     .use(assetRoutes)

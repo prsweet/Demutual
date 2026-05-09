@@ -170,14 +170,6 @@ const buildJupiterSellPlan = async ({
       return status(400, response(false, null, errors.jupiterSellNothingToSwap400));
     }
 
-    const platBps = platformFeeBps();
-    const platWallet = platformFeeWallet();
-    const creatorBps = creatorFeeBps();
-    const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
-    const platLamports = platformFeeActive() ? Math.floor((total * platBps) / 10000) : 0;
-    const creatorLamports =
-      creatorBps > 0 && creatorWallet ? Math.floor((total * creatorBps) / 10000) : 0;
-
     return status(
       200,
       response(
@@ -189,38 +181,9 @@ const buildJupiterSellPlan = async ({
           userWallet: user.walletAddress,
           slippageBps,
           legs,
-          feeTransfer:
-            platLamports + creatorLamports > 0
-              ? {
-                  totalLamports: platLamports + creatorLamports,
-                  splits: [
-                    ...(platLamports > 0 && platWallet
-                      ? [
-                          {
-                            recipient: "platform" as const,
-                            toPubkey: platWallet,
-                            lamports: platLamports,
-                            bps: platBps
-                          }
-                        ]
-                      : []),
-                    ...(creatorLamports > 0 && creatorWallet
-                      ? [
-                          {
-                            recipient: "creator" as const,
-                            toPubkey: creatorWallet,
-                            lamports: creatorLamports,
-                            bps: creatorBps
-                          }
-                        ]
-                      : [])
-                  ],
-                  reason:
-                    "Investor-signed SOL transfer with platform + creator splits in ONE tx. Send AFTER the swap legs land SOL in your wallet, then pass its signature to /sell/jupiter-complete."
-                }
-              : null,
+          feeTransfer: null,
           note:
-            "ExactOut quotes: each swap pulls the asset from your wallet and lands SOL. Sign and send each leg, then send the feeTransfer (if present), then call /sell/jupiter-complete with both."
+            "ExactOut quotes: each swap pulls the asset from your wallet and lands SOL. Sign and send each leg, then call /sell/jupiter-complete with the signatures."
         }),
         null
       )
@@ -251,7 +214,6 @@ const completeJupiterSell = async ({
     if (sigs.length === 0) {
       return status(400, response(false, null, errors.typeBox400));
     }
-    const feeSig = body.feeTransferSignature?.trim();
 
     const dup = await prisma.withdrawal.findUnique({
       where: { transactionSignature: sigs[0] },
@@ -292,45 +254,6 @@ const completeJupiterSell = async ({
       return status(400, response(false, null, errors.withdrawInsufficient400));
     }
 
-    const platBps = platformFeeBps();
-    const platWallet = platformFeeWallet();
-    const creatorBps = creatorFeeBps();
-    const bucketCreator = await prisma.bucket.findUnique({
-      where: { id: params.id },
-      select: { creator: { select: { walletAddress: true } } }
-    });
-    const creatorWallet = bucketCreator?.creator?.walletAddress?.trim() || null;
-    const grossLamports = Number(grossLamportsFromSol(gross));
-    const expectedPlat = platformFeeActive() ? Math.floor((grossLamports * platBps) / 10000) : 0;
-    const expectedCreator =
-      creatorBps > 0 && creatorWallet ? Math.floor((grossLamports * creatorBps) / 10000) : 0;
-    const expectedTransfers: { to: string; lamports: bigint }[] = [];
-    if (expectedPlat > 0 && platWallet)
-      expectedTransfers.push({ to: platWallet, lamports: BigInt(expectedPlat) });
-    if (expectedCreator > 0 && creatorWallet)
-      expectedTransfers.push({ to: creatorWallet, lamports: BigInt(expectedCreator) });
-
-    if (expectedTransfers.length > 0) {
-      if (!feeSig) {
-        return status(400, response(false, null, errors.feeTransferRequired400));
-      }
-      const rpcUrl = process.env.SOLANA_RPC_URL?.trim();
-      if (!rpcUrl) {
-        return status(503, response(false, null, errors.investNotConfigured503));
-      }
-      try {
-        await verifyInvestFeeBundle({
-          rpcUrl,
-          signature: feeSig,
-          expectedFrom: user.walletAddress,
-          expectedTransfers
-        });
-      } catch (e) {
-        console.error("[completeJupiterSell fee verify]", e);
-        return status(400, response(false, null, errors.feeTransferVerify400));
-      }
-    }
-
     const result = await prisma.$transaction(async (tx) => {
       const withdrawal = await tx.withdrawal.create({
         data: {
@@ -358,7 +281,7 @@ const completeJupiterSell = async ({
           withdrawal: result.withdrawal,
           bucket: result.bucket,
           transactionSignatures: sigs,
-          feeTransferSignature: feeSig ?? null
+          feeTransferSignature: null
         }),
         null
       )

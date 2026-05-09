@@ -18,7 +18,7 @@ import {
 
 const getAllBuckets = async ({
   query: rawQuery
-}: decoratedContext<Context<{ query: listBucketsQuerySchema }>>) => {
+}: { query?: listBucketsQuerySchema }) => {
   try {
     const query = rawQuery ?? {};
     const where: {
@@ -34,15 +34,24 @@ const getAllBuckets = async ({
       where.type = "PUBLISHED";
     }
 
-    const buckets = await prisma.bucket.findMany({
-      where,
-      orderBy: [{ name: "asc" }, { version: "asc" }],
-      include: {
-        listing: { include: { asset: true } },
-        creator: { select: { id: true, username: true, walletAddress: true } }
-      }
-    });
-    return status(200, response(true, toJsonSafe(buckets), null));
+    const limit = query.limit ?? 20;
+    const offset = query.offset ?? 0;
+
+    const [total, buckets] = await Promise.all([
+      prisma.bucket.count({ where }),
+      prisma.bucket.findMany({
+        where,
+        orderBy: [{ name: "asc" }, { version: "asc" }],
+        take: limit,
+        skip: offset,
+        include: {
+          listing: { include: { asset: true } },
+          creator: { select: { id: true, username: true, walletAddress: true } },
+          _count: { select: { deposits: true, listing: true } }
+        }
+      })
+    ]);
+    return status(200, response(true, toJsonSafe({ data: buckets, total, limit, offset }), null));
   } catch (e) {
     console.error("[getAllBuckets]", e);
     return status(500, response(false, null, errors.serverError500));

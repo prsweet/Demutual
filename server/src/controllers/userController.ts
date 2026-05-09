@@ -35,28 +35,40 @@ const getMe = async ({ userId }: decoratedContext<Context>) => {
   }
 };
 
-const getMyDeposits = async ({ userId }: decoratedContext<Context>) => {
+import { type paginationQuerySchema } from "../types";
+
+const getMyDeposits = async ({
+  userId,
+  query
+}: { userId?: string; query?: paginationQuerySchema }) => {
   try {
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
 
-    const deposits = await prisma.deposit.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: {
-        bucket: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            tvl: true,
-            version: true
+    const limit = query?.limit ?? 20;
+    const offset = query?.offset ?? 0;
+
+    const [total, deposits] = await Promise.all([
+      prisma.deposit.count({ where: { userId } }),
+      prisma.deposit.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+        include: {
+          bucket: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              tvl: true,
+              version: true
+            }
           }
         }
-      }
-    });
+      })
+    ]);
 
-    return status(200, response(true, toJsonSafe(deposits), null));
+    return status(200, response(true, toJsonSafe({ data: deposits, total, limit, offset }), null));
   } catch (e) {
     console.error("[getMyDeposits]", e);
     return status(500, response(false, null, errors.serverError500));
