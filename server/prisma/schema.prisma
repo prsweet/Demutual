@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+    provider = "prisma-client"
+    output   = "../generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model User {
+    id String @id @default(cuid())
+    username String
+    walletAddress String @unique
+    createdAt DateTime @default(now())
+    buckets Bucket[]
+    history History[]
+    deposits Deposit[]
+    withdrawals Withdrawal[]
+}
+
+model Deposit {
+    id String @id @default(cuid())
+    bucketId String
+    userId String
+    bucket Bucket @relation(references: [id], fields: [bucketId])
+    user User @relation(references: [id], fields: [userId])
+    /// Net USDC (or unit) credited to the bucket TVL after protocol fee.
+    amount Decimal
+    feeCreator Decimal @default(0)
+    feePlatform Decimal @default(0)
+    /// Set when invest is confirmed on-chain (SOL transfer to treasury).
+    transactionSignature String? @unique
+    /// Jupiter basket invest: all swap tx signatures (same order as plan legs).
+    jupiterLegSignatures Json?
+    createdAt DateTime @default(now())
+}
+
+model Withdrawal {
+    id String @id @default(cuid())
+    bucketId String
+    userId String
+    bucket Bucket @relation(references: [id], fields: [bucketId])
+    user User @relation(references: [id], fields: [userId])
+    amount Decimal
+    /// First sell-leg signature when sell goes through Jupiter (mainnet); null for ledger-only withdrawals.
+    transactionSignature String? @unique
+    /// All Jupiter sell leg signatures, in plan order.
+    jupiterLegSignatures Json?
+    createdAt DateTime @default(now())
+
+    @@map("Withdawal")
+}
+
+model History {
+    id String @id @default(cuid())
+    userId String
+    user User @relation(references: [id], fields: [userId])
+    purchaseDate DateTime // have to complete it
+}
+
+model Asset {
+    id String @id @unique
+    name String
+    symbol String
+    iconUrl String
+    decimals Int @default(9)
+    listing Listing[]
+    // think about what the asset will contain
+}
+
+model Listing {
+    id String @id @default(cuid())
+    bucketId String
+    assetId String
+    percentage Decimal?
+    bucket Bucket @relation(references: [id], fields: [bucketId])
+    asset Asset @relation(references: [id], fields: [assetId])
+}
+
+model Bucket {
+    id String @id @default(cuid())
+    name String 
+    version Int @default(0)
+    creatorId String
+    creator User @relation(references: [id], fields: [creatorId])
+    listing Listing[]
+    tvl Decimal
+    apy Decimal?
+    estimated_apy Decimal
+    type BucketType @default(DRAFT)
+    metaData Json?
+    createdAt DateTime @default(now())
+    deposits Deposit[]
+    withdrawals Withdrawal[]
+    @@unique([creatorId, name, version])
+}
+
+enum BucketType {
+    DRAFT
+    PUBLISHED
+}
+
+model Nonce {
+    id String @id @default(cuid())
+    walletAddress String
+    value String
+    used Boolean
+    expiresAt DateTime // expiresAt: new Date(Date.now() + 5 * 60 * 1000) 
+    createdAt DateTime @default(now())
+}
