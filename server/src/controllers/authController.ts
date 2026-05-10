@@ -28,10 +28,6 @@ const walletLogin = async ({ body, set }: decoratedContext<Context<{ body: walle
 
     const signatureAuthorized = await verifySignature(pubkey, signatureBytes, messageBytes);
     if (!signatureAuthorized) return status(402, response(false, null, errors.nonce402));
-    await prisma.nonce.update({
-      where: { id: nonceRecorded.id },
-      data: { used: true }
-    });
 
     let loginUser = await prisma.user.findFirst({
       where: { walletAddress: body.address }
@@ -42,8 +38,20 @@ const walletLogin = async ({ body, set }: decoratedContext<Context<{ body: walle
         return status(400, response(false, null, errors.walletLoginUsernameRequired400));
       }
       set.status = 201;
-      loginUser = await prisma.user.create({
-        data: { walletAddress: body.address, username }
+      loginUser = await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: { walletAddress: body.address, username }
+        });
+        await tx.nonce.update({
+          where: { id: nonceRecorded.id },
+          data: { used: true }
+        });
+        return created;
+      });
+    } else {
+      await prisma.nonce.update({
+        where: { id: nonceRecorded.id },
+        data: { used: true }
       });
     }
 

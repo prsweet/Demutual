@@ -15,6 +15,8 @@ import {
   fetchBucketById,
   fetchMyPosition,
   postJupiterInvestComplete,
+  postJupiterInvestExecute,
+  postJupiterLegOrder,
   postJupiterInvestPlan,
   postJupiterSellComplete,
   postJupiterSellPlan,
@@ -27,6 +29,7 @@ import {
   getConnectedAddress,
   getConnectedProvider,
   signAndSendVersioned,
+  signVersionedTransactionToBase64,
   signFeeTransfer,
   solToLamports,
   walletSendSolTransfer
@@ -48,6 +51,32 @@ function errHint(code: string): string {
   return m[code] ?? code;
 }
 
+function hintIfRentError(message: string): string | null {
+  if (!message) return null;
+  if (message.includes("InsufficientFundsForRent") || message.includes("insufficient funds for rent")) {
+    return [
+      "Insufficient SOL for rent to create token accounts (ATAs).",
+      "Add a bit more SOL to your wallet (rent is paid on-chain), or use a larger swap amount / fewer legs, or pre-create the needed token accounts by receiving those tokens once."
+    ].join(" ");
+  }
+  return null;
+}
+
+function formatBaseUnits(amount: string | number | undefined, decimals: number, fractionDigits = 4): string {
+  if (amount === undefined || amount === null) return "0";
+  const s = typeof amount === "number" ? String(Math.trunc(amount)) : String(amount);
+  const neg = s.startsWith("-");
+  const raw = neg ? s.slice(1) : s;
+  if (!/^\d+$/.test(raw)) return "0";
+  const d = Math.max(0, Math.floor(decimals));
+  const padded = raw.padStart(d + 1, "0");
+  const intPart = padded.slice(0, padded.length - d);
+  const fracFull = d === 0 ? "" : padded.slice(padded.length - d);
+  const fracTrimmed = fracFull.slice(0, Math.max(0, fractionDigits)).replace(/0+$/, "");
+  const out = fracTrimmed ? `${intPart}.${fracTrimmed}` : intPart;
+  return neg ? `-${out}` : out;
+}
+
 export function BucketDetailPage() {
   const { id: routeId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -65,6 +94,7 @@ export function BucketDetailPage() {
   const [treasuryInput, setTreasuryInput] = useState("");
   const [investSol, setInvestSol] = useState("0.01");
   const [jupiterSol, setJupiterSol] = useState("0.01");
+  const [jupiterBuyPlan, setJupiterBuyPlan] = useState<Awaited<ReturnType<typeof postJupiterInvestPlan>> | null>(null);
   const [sellSol, setSellSol] = useState("0.01");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -166,13 +196,13 @@ export function BucketDetailPage() {
       await loadPosition();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(errHint(msg) || msg);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
     } finally {
       setBusy(null);
     }
   };
 
-  const runJupiterBuy = async () => {
+  const buildJupiterBuyPlan = async () => {
     if (!bucket || !published || !user) {
       setIsWalletOpen(true);
       return;
@@ -191,13 +221,40 @@ export function BucketDetailPage() {
 
     setBusy("Building Jupiter plan…");
     setError(null);
+    setJupiterBuyPlan(null);
     try {
       const plan = await postJupiterInvestPlan(bucket.id, { solAmount: amount, slippageBps: 80 });
+      setJupiterBuyPlan(plan);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const executeJupiterBuyPlan = async () => {
+    if (!jupiterBuyPlan || !bucket || !user) return;
+    const provider = getConnectedProvider();
+    if (!provider || !walletAddr) return;
+
+    const plan = jupiterBuyPlan;
+    const amount = parseFloat(jupiterSol);
+    
+    setBusy("Initializing execution…");
+    setError(null);
+    
+    try {
       const swaps = plan.legs.filter(
-        (l): l is JupiterPlanLeg & { swapTransactionBase64: string } =>
+        (l): l is JupiterPlanLeg & {
+          outputMint: string;
+          inputLamports: number;
+        } =>
           l.kind === "swap" &&
-          typeof l.swapTransactionBase64 === "string" &&
-          l.swapTransactionBase64.length > 0
+          typeof l.outputMint === "string" &&
+          l.outputMint.length > 0 &&
+          typeof l.inputLamports === "number" &&
+          l.inputLamports > 0
       );
       if (swaps.length === 0) {
         setError("No swap legs — check bucket assets.");
@@ -212,12 +269,28 @@ export function BucketDetailPage() {
         feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
       }
       const sigs: string[] = [];
+      const slippageBps = plan.slippageBps ?? 80;
       for (let i = 0; i < swaps.length; i++) {
         const leg = swaps[i]!;
         setBusy(`Swap ${i + 1}/${swaps.length} (${leg.symbol ?? "token"})…`);
-        const vtx = VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64));
-        const sig = await signAndSendVersioned(provider, connection, vtx);
-        sigs.push(sig);
+        // Fetch a *fresh* Jupiter order right before signing so the blockhash is current.
+        // Jupiter `/order` transactions expire in ~60s, which is why earlier leg(s) can land
+        // and later ones expire while the user is still signing.
+        const fresh = await postJupiterLegOrder(bucket.id, {
+          outputMint: leg.outputMint,
+          lamports: leg.inputLamports,
+          slippageBps
+        });
+        const vtx = VersionedTransaction.deserialize(b64ToUint8Array(fresh.swapTransactionBase64));
+        const signedTransaction = await signVersionedTransactionToBase64(provider, vtx);
+        const exec = await postJupiterInvestExecute(bucket.id, {
+          signedTransaction,
+          requestId: fresh.requestId
+        });
+        if (exec.status !== "Success") {
+          throw new Error(exec.error || `JUPITER_EXECUTE_FAILED_${exec.code}`);
+        }
+        sigs.push(exec.signature);
       }
       setBusy("Recording TVL…");
       await postJupiterInvestComplete(bucket.id, {
@@ -225,11 +298,12 @@ export function BucketDetailPage() {
         transactionSignatures: sigs,
         ...(feeTransferSignature ? { feeTransferSignature } : {})
       });
+      setJupiterBuyPlan(null);
       await load();
       await loadPosition();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(errHint(msg) || msg);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
     } finally {
       setBusy(null);
     }
@@ -449,17 +523,161 @@ export function BucketDetailPage() {
                   type="number"
                   step="any"
                   value={jupiterSol}
-                  onChange={(e) => setJupiterSol(e.target.value)}
+                  onChange={(e) => {
+                    setJupiterSol(e.target.value);
+                    setJupiterBuyPlan(null); // Reset plan if input changes
+                  }}
                   className="w-full max-w-[200px] mb-3 px-3 py-2 rounded-[10px] border border-black/10 bg-white"
                 />
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void runJupiterBuy()}
-                  className="px-5 py-2.5 rounded-[10px] bg-[#1a1c1e] text-white text-[14px] font-semibold disabled:opacity-50"
-                >
-                  Build plan & sign swaps
-                </button>
+                
+                {!jupiterBuyPlan ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void buildJupiterBuyPlan()}
+                    className="px-5 py-2.5 rounded-[10px] bg-[#1a1c1e] text-white text-[14px] font-semibold disabled:opacity-50"
+                  >
+                    Build Plan & Preview
+                  </button>
+                ) : (
+                  <div className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50">
+                    <h3 className="text-[14px] font-semibold text-blue-900 mb-3">Plan Preview</h3>
+                    
+                    <div className="space-y-3 mb-4">
+                      {jupiterBuyPlan.legs.map((leg, i) => (
+                        <div key={i} className="text-[13px] flex justify-between">
+                          <span className="text-blue-800 font-medium">
+                            {leg.kind === "swap" ? `Swap for ${leg.symbol}` : `Keep ${leg.symbol}`}
+                          </span>
+                          <span className="text-blue-900">
+                            {leg.kind === "swap"
+                              ? (() => {
+                                  const mint = leg.outputMint || "";
+                                  const row = (bucket?.listing ?? []).find((r) => r.assetId === mint);
+                                  const asset = row?.asset as { decimals?: number } | undefined;
+                                  const decimals = typeof asset?.decimals === "number" ? asset.decimals : mint ? 6 : 6;
+                                  return `~${formatBaseUnits(leg.expectedOutAmount, decimals, 4)}`;
+                                })()
+                              : `${((leg.inputLamports ?? 0) / 10**9).toFixed(4)} SOL`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="h-px w-full bg-blue-200/50 my-3" />
+                    
+                    <div className="flex justify-between text-[12px] text-blue-800 mb-1">
+                      <span>Max Slippage:</span>
+                      <span>{(((jupiterBuyPlan.slippageBps ?? 0) as number) / 100).toFixed(2)}%</span>
+                    </div>
+                    
+                    {jupiterBuyPlan.feeTransfer && (
+                      <div className="flex justify-between text-[12px] text-blue-800 mb-4">
+                        <span>Platform/Creator Fee:</span>
+                        <span>
+                          {(() => {
+                            const lamports = jupiterBuyPlan.feeTransfer?.totalLamports ?? 0;
+                            const sol = lamports / 1e9;
+                            if (lamports > 0 && sol < 0.0001) return `${lamports} lamports (${sol.toFixed(9)} SOL)`;
+                            return `${sol.toFixed(4)} SOL`;
+                          })()}
+                        </span>
+                      </div>
+                    )}
+
+                    {!jupiterBuyPlan.feeTransfer && jupiterBuyPlan.feeTransferSkippedReason && (
+                      <div className="mt-1 mb-3 text-[12px] text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-lg p-2 leading-snug">
+                        Fee transfer skipped: {jupiterBuyPlan.feeTransferSkippedReason}
+                      </div>
+                    )}
+
+                    {(() => {
+                      const swapLamports = jupiterBuyPlan.legs
+                        .filter((l) => l.kind === "swap")
+                        .reduce((acc, l) => acc + (l.inputLamports ?? 0), 0);
+                      const rentLamports = jupiterBuyPlan.investorRequirements?.estimatedRentLamports ?? 0;
+                      const feeLamports = jupiterBuyPlan.feeTransfer?.totalLamports ?? 0;
+                      const networkFeeLamports = 5000 * jupiterBuyPlan.legs.length; // rough per-tx network fee
+                      const totalLamports = swapLamports + rentLamports + feeLamports + networkFeeLamports;
+                      const rentShare = swapLamports > 0 ? rentLamports / swapLamports : 0;
+                      const inefficient = rentShare > 0.3 && rentLamports > 0;
+                      const fmtSol = (lamports: number) => (lamports / 1e9).toFixed(6);
+                      return (
+                        <div className="mt-3 rounded-lg border border-blue-300/70 bg-white/60 p-3">
+                          <div className="text-[12px] font-semibold text-blue-900 mb-2">
+                            Expected wallet debit
+                          </div>
+                          <div className="flex justify-between text-[12px] text-blue-800 mb-1">
+                            <span>Swap input (basket allocation)</span>
+                            <span className="font-mono">{fmtSol(swapLamports)} SOL</span>
+                          </div>
+                          {rentLamports > 0 && (
+                            <div className="flex justify-between text-[12px] text-blue-800 mb-1">
+                              <span>
+                                One-time token-account rent
+                                <span className="text-blue-900/60">
+                                  {" "}
+                                  ({jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0} new account
+                                  {(jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0) === 1 ? "" : "s"})
+                                </span>
+                              </span>
+                              <span className="font-mono">{fmtSol(rentLamports)} SOL</span>
+                            </div>
+                          )}
+                          {feeLamports > 0 && (
+                            <div className="flex justify-between text-[12px] text-blue-800 mb-1">
+                              <span>Platform/creator fee</span>
+                              <span className="font-mono">{fmtSol(feeLamports)} SOL</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-[12px] text-blue-800 mb-2">
+                            <span>Estimated network fees</span>
+                            <span className="font-mono">~{fmtSol(networkFeeLamports)} SOL</span>
+                          </div>
+                          <div className="h-px w-full bg-blue-200/70 mb-2" />
+                          <div className="flex justify-between text-[13px] font-semibold text-blue-900">
+                            <span>Total expected debit</span>
+                            <span className="font-mono">~{fmtSol(totalLamports)} SOL</span>
+                          </div>
+                          {rentLamports > 0 && (
+                            <div className="mt-2 text-[11px] text-blue-900/70 leading-snug">
+                              Token-account rent is locked in your new token accounts and is{" "}
+                              <span className="font-medium">recoverable</span> if you ever close them.
+                              It is paid only the first time you receive each token in this wallet.
+                            </div>
+                          )}
+                          {inefficient && (
+                            <div className="mt-2 text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-2 leading-snug">
+                              Heads up: at this size, one-time rent is{" "}
+                              <span className="font-mono">{(rentShare * 100).toFixed(0)}%</span> of your swap input.
+                              You'll get more token per SOL by using a larger amount, or by reusing this wallet for future
+                              buys (the rent is one-time per token).
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void executeJupiterBuyPlan()}
+                        className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-[13px] font-semibold disabled:opacity-50"
+                      >
+                        Confirm & Execute Swaps
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => setJupiterBuyPlan(null)}
+                        className="px-4 py-2 rounded-lg bg-white border border-blue-200 text-blue-800 text-[13px] font-semibold disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
                 <h2 className="text-[15px] font-semibold text-[#374151] mb-2">Jupiter basket sell</h2>

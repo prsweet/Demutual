@@ -29,6 +29,7 @@ type SellLeg =
       /** Estimated input amount in the asset's base units, from Jupiter. */
       estInputAmount: string;
       swapTransactionBase64: string;
+      requestId?: string;
     }
   | {
       kind: "noop";
@@ -159,6 +160,9 @@ const buildJupiterSellPlan = async ({
           estInputAmount: String(quote.inAmount ?? "?"),
           swapTransactionBase64: swapTransaction
         });
+
+        // Delay to avoid Jupiter 429 rate limit on free tier
+        await new Promise((resolve) => setTimeout(resolve, 600));
       } catch (e) {
         console.error("[buildJupiterSellPlan leg]", inMint, e);
         return status(400, response(false, null, errors.jupiterSellPlan400));

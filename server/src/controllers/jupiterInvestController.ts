@@ -10,11 +10,14 @@ import {
 import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestFeeBundle } from "../investTxVerify";
 import { toJsonSafe } from "../jsonSafe";
-import { jupiterGetQuote, jupiterPostSwap, WSOL_MINT } from "../services/jupiterSwap";
+import { checkFeeRecipientsRentSafe, estimateMissingAtaRentLamports } from "../services/ataRent";
+import { jupiterExecute, jupiterOrder, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
+  type jupiterExecuteSchema,
   type jupiterInvestCompleteSchema,
   type jupiterInvestPlanSchema,
+  type jupiterLegOrderSchema,
   response,
   type decoratedContext
 } from "../types";
@@ -29,6 +32,7 @@ type PlanLeg =
       expectedOutAmount: string;
       minimumOutAmount: string;
       swapTransactionBase64: string;
+      requestId?: string;
     }
   | {
       kind: "noop";
@@ -108,6 +112,19 @@ const buildJupiterPlan = async ({
     let allocated = 0;
     const n = listings.length;
 
+    const rpcUrl = process.env.SOLANA_RPC_URL?.trim() || "";
+    const ataRent =
+      rpcUrl && user.walletAddress
+        ? await estimateMissingAtaRentLamports({
+            rpcUrl,
+            owner: user.walletAddress,
+            mints: [WSOL_MINT, ...listings.map((l) => l.assetId)]
+          }).catch((e) => {
+            console.warn("[ataRent] check failed", e);
+            return null;
+          })
+        : null;
+
     for (let i = 0; i < n; i++) {
       const row = listings[i]!;
       const pct = Number(row.percentage);
@@ -132,18 +149,12 @@ const buildJupiterPlan = async ({
       }
 
       try {
-        const quote = await jupiterGetQuote({
+        const order = await jupiterOrder({
           inputMint: WSOL_MINT,
           outputMint: outMint,
           amountLamports: lamports,
-          slippageBps
-        });
-        const expectedOutAmount = String((quote as any).outAmount || "0");
-        const minimumOutAmount = String((quote as any).otherAmountThreshold || "0");
-
-        const { swapTransaction } = await jupiterPostSwap({
-          quoteResponse: quote,
-          userPublicKey: user.walletAddress
+          slippageBps,
+          taker: user.walletAddress
         });
         legs.push({
           kind: "swap",
@@ -151,10 +162,14 @@ const buildJupiterPlan = async ({
           symbol,
           percentage: pct,
           inputLamports: lamports,
-          expectedOutAmount,
-          minimumOutAmount,
-          swapTransactionBase64: swapTransaction
+          expectedOutAmount: order.outAmount,
+          minimumOutAmount: order.otherAmountThreshold || "0",
+          swapTransactionBase64: order.transaction,
+          requestId: order.requestId
         });
+
+        // Delay to avoid Jupiter 429 rate limit on free tier
+        await new Promise((resolve) => setTimeout(resolve, 600));
       } catch (e) {
         console.error("[buildJupiterPlan leg]", outMint, e);
         return status(400, response(false, null, errors.jupiterPlan400));
@@ -164,6 +179,48 @@ const buildJupiterPlan = async ({
     const swapCount = legs.filter((l) => l.kind === "swap").length;
     if (swapCount === 0) {
       return status(400, response(false, null, errors.jupiterNothingToSwap400));
+    }
+
+    const splitsRaw: { recipient: "platform" | "creator"; toPubkey: string; lamports: number; bps: number }[] = [
+      ...(platLamports > 0 && platWallet
+        ? [{ recipient: "platform" as const, toPubkey: platWallet, lamports: platLamports, bps: platBps }]
+        : []),
+      ...(creatorLamports > 0 && creatorWallet
+        ? [{ recipient: "creator" as const, toPubkey: creatorWallet, lamports: creatorLamports, bps: creatorBps }]
+        : [])
+    ];
+
+    let feeTransferSkippedReason: string | null = null;
+    let safeFeeTransfer: {
+      totalLamports: number;
+      splits: typeof splitsRaw;
+      reason: string;
+    } | null = null;
+
+    if (splitsRaw.length > 0) {
+      const safetyCheck = rpcUrl
+        ? await checkFeeRecipientsRentSafe({ rpcUrl, recipients: splitsRaw }).catch((e) => {
+            console.warn("[feeRecipientCheck] failed", e);
+            return null;
+          })
+        : null;
+
+      if (safetyCheck && safetyCheck.unsafe.length > 0) {
+        feeTransferSkippedReason =
+          `Skipped fee transfer: ${safetyCheck.unsafe.length} recipient(s) ` +
+          `do not exist on-chain and the split (${safetyCheck.unsafe
+            .map((u) => `${u.lamports} lamports`)
+            .join(", ")}) is below the system rent-exempt minimum ` +
+          `(${safetyCheck.systemAccountRentExemptLamports} lamports). ` +
+          `Fund those recipient wallets with at least the rent-exempt minimum or raise PLATFORM_FEE_BPS / CREATOR_FEE_BPS so each split exceeds it.`;
+      } else {
+        safeFeeTransfer = {
+          totalLamports: platLamports + creatorLamports,
+          splits: splitsRaw,
+          reason:
+            "Investor-signed SOL transfer with both fee splits in ONE tx. Send BEFORE the swap legs and pass its signature to /invest/jupiter-complete."
+        };
+      }
     }
 
     return status(
@@ -177,38 +234,17 @@ const buildJupiterPlan = async ({
           userWallet: user.walletAddress,
           slippageBps,
           legs,
-          feeTransfer:
-            platLamports + creatorLamports > 0
-              ? {
-                  totalLamports: platLamports + creatorLamports,
-                  splits: [
-                    ...(platLamports > 0 && platWallet
-                      ? [
-                          {
-                            recipient: "platform" as const,
-                            toPubkey: platWallet,
-                            lamports: platLamports,
-                            bps: platBps
-                          }
-                        ]
-                      : []),
-                    ...(creatorLamports > 0 && creatorWallet
-                      ? [
-                          {
-                            recipient: "creator" as const,
-                            toPubkey: creatorWallet,
-                            lamports: creatorLamports,
-                            bps: creatorBps
-                          }
-                        ]
-                      : [])
-                  ],
-                  reason:
-                    "Investor-signed SOL transfer with both fee splits in ONE tx. Send BEFORE the swap legs and pass its signature to /invest/jupiter-complete."
-                }
-              : null,
+          feeTransfer: safeFeeTransfer,
+          feeTransferSkippedReason,
+          investorRequirements: ataRent
+            ? {
+                rentPerAtaLamports: ataRent.rentPerAtaLamports,
+                missingAtas: ataRent.missingAtas,
+                estimatedRentLamports: ataRent.estimatedRentLamports
+              }
+            : null,
           note:
-            "Sign feeTransfer (if present) first, then sign and send each swap leg with the same wallet. Devnet RPC will not match Jupiter mainnet routes."
+            "Investor requirements: keep extra SOL for network fees AND rent to create token accounts (ATAs) for tokens you don’t already hold—otherwise swaps may fail simulation with InsufficientFundsForRent. Sign feeTransfer (if present) first, then sign and send each swap leg with the same wallet. Devnet RPC will not match Jupiter mainnet routes."
         }),
         null
       )
@@ -285,23 +321,34 @@ const completeJupiterInvest = async ({
       expectedTransfers.push({ to: creatorWallet, lamports: BigInt(expectedCreator) });
 
     if (expectedTransfers.length > 0) {
-      if (!feeSig) {
-        return status(400, response(false, null, errors.feeTransferRequired400));
-      }
       const rpcUrl = process.env.SOLANA_RPC_URL?.trim();
       if (!rpcUrl) {
         return status(503, response(false, null, errors.investNotConfigured503));
       }
-      try {
-        await verifyInvestFeeBundle({
-          rpcUrl,
-          signature: feeSig,
-          expectedFrom: user.walletAddress,
-          expectedTransfers
-        });
-      } catch (e) {
-        console.error("[completeJupiterInvest fee verify]", e);
-        return status(400, response(false, null, errors.feeTransferVerify400));
+
+      // Mirror buildJupiterPlan: if any recipient would fail rent simulation, the plan
+      // skipped feeTransfer entirely — so don't require a feeSig here either.
+      const safety = await checkFeeRecipientsRentSafe({
+        rpcUrl,
+        recipients: expectedTransfers.map((t) => ({ toPubkey: t.to, lamports: Number(t.lamports) }))
+      }).catch(() => null);
+      const feeTransferSkipped = !!(safety && safety.unsafe.length > 0);
+
+      if (!feeTransferSkipped) {
+        if (!feeSig) {
+          return status(400, response(false, null, errors.feeTransferRequired400));
+        }
+        try {
+          await verifyInvestFeeBundle({
+            rpcUrl,
+            signature: feeSig,
+            expectedFrom: user.walletAddress,
+            expectedTransfers
+          });
+        } catch (e) {
+          console.error("[completeJupiterInvest fee verify]", e);
+          return status(400, response(false, null, errors.feeTransferVerify400));
+        }
       }
     }
 
@@ -361,7 +408,109 @@ const completeJupiterInvest = async ({
   }
 };
 
+/** Build a fresh Jupiter order for a single leg right before signing. Avoids blockhash expiry on multi-leg flows. */
+const buildJupiterLegOrder = async ({
+  params,
+  userId,
+  body
+}: decoratedContext<Context<{ params: { id: string }; body: jupiterLegOrderSchema }>>) => {
+  try {
+    if (!userId) return status(401, response(false, null, errors.unauthorized401));
+    if (isDevnet()) {
+      return status(400, response(false, null, errors.jupiterDevnetUnsupported400));
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { walletAddress: true }
+    });
+    if (!user) return status(401, response(false, null, errors.unauthorized401));
+
+    const bucket = await prisma.bucket.findUnique({
+      where: { id: params.id },
+      include: { listing: true }
+    });
+    if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+    if (bucket.type !== "PUBLISHED") {
+      return status(400, response(false, null, errors.bucketNotPublished400));
+    }
+
+    const outMint = body.outputMint.trim();
+    const lamports = Math.floor(Number(body.lamports));
+    if (!outMint || !Number.isFinite(lamports) || lamports <= 0) {
+      return status(400, response(false, null, errors.typeBox400));
+    }
+    if (outMint === WSOL_MINT) {
+      return status(400, response(false, null, errors.jupiterPlan400));
+    }
+    const inListings = bucket.listing.some((l) => l.assetId === outMint);
+    if (!inListings) {
+      return status(400, response(false, null, errors.jupiterPlan400));
+    }
+
+    const slippageBps = body.slippageBps ?? 80;
+    const order = await jupiterOrder({
+      inputMint: WSOL_MINT,
+      outputMint: outMint,
+      amountLamports: lamports,
+      slippageBps,
+      taker: user.walletAddress
+    });
+
+    return status(
+      200,
+      response(
+        true,
+        toJsonSafe({
+          outputMint: outMint,
+          inputLamports: lamports,
+          slippageBps,
+          swapTransactionBase64: order.transaction,
+          requestId: order.requestId,
+          expectedOutAmount: order.outAmount,
+          minimumOutAmount: order.otherAmountThreshold || "0"
+        }),
+        null
+      )
+    );
+  } catch (e) {
+    console.error("[buildJupiterLegOrder]", e);
+    return status(400, response(false, null, errors.jupiterPlan400));
+  }
+};
+
 export const jupiterInvestControllers = {
   buildJupiterPlan,
+  buildJupiterLegOrder,
+  executeJupiterOrder: async ({
+    userId,
+    body
+  }: decoratedContext<Context<{ params: { id: string }; body: jupiterExecuteSchema }>>) => {
+    try {
+      if (!userId) return status(401, response(false, null, errors.unauthorized401));
+      if (isDevnet()) {
+        return status(400, response(false, null, errors.jupiterDevnetUnsupported400));
+      }
+
+      const signedTransaction = body.signedTransaction.trim();
+      const requestId = body.requestId.trim();
+      if (!signedTransaction || !requestId) {
+        return status(400, response(false, null, errors.typeBox400));
+      }
+
+      const result = await jupiterExecute({
+        signedTransaction,
+        requestId,
+        ...(typeof body.lastValidBlockHeight === "number"
+          ? { lastValidBlockHeight: body.lastValidBlockHeight }
+          : {})
+      });
+
+      return status(200, response(true, toJsonSafe(result), null));
+    } catch (e) {
+      console.error("[executeJupiterOrder]", e);
+      return status(400, response(false, null, errors.jupiterPlan400));
+    }
+  },
   completeJupiterInvest
 };

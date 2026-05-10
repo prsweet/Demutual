@@ -103,7 +103,7 @@ const STABLE: CatalogAsset[] = [
     id: "USDSwr9ApdHk5bvJKMjzff41FfuX8bSxdKcR81vTwcA",
     name: "USDS (Sky)",
     symbol: "USDS",
-    iconUrl: "https://static.jup.ag/tokens/USDSwr9ApdHk5bvJKMjzff41FfuX8bSxdKcR81vTwcA/icon.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/39926/thumb/usds.webp?1726666683",
     decimals: 6,
     category: "stablecoin"
   }
@@ -119,10 +119,10 @@ const YIELD: CatalogAsset[] = [
     category: "yield"
   },
   {
-    id: "J1toso1uCk3RLmjorhTtrtweRErXLVgqDdMSSSLsV7cp",
+    id: "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
     name: "Jito Staked SOL",
     symbol: "JitoSOL",
-    iconUrl: gh("J1toso1uCk3RLmjorhTtrtweRErXLVgqDdMSSSLsV7cp"),
+    iconUrl: gh("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
     decimals: 9,
     category: "yield"
   },
@@ -138,7 +138,7 @@ const YIELD: CatalogAsset[] = [
     id: "Dso1bDeDjCQxFWDZi6dL6Ap3pJGFMBSBbhi5gAcRmYc",
     name: "Drift Staked SOL",
     symbol: "dSOL",
-    iconUrl: "https://drift-public.s3.eu-central-1.amazonaws.com/dSOL.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/28046/thumb/JitoSOL-200.png?1696527060",
     decimals: 9,
     category: "yield"
   },
@@ -154,7 +154,7 @@ const YIELD: CatalogAsset[] = [
     id: "27G8MtK7FvTc739iBy7sw7WTXWDJTzkmPLD8SrCsQffD",
     name: "Jupiter Perps LP",
     symbol: "JLP",
-    iconUrl: "https://static.jup.ag/jlp/icon.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/18369/thumb/logo_-_2021-09-15T100934.765.png?1696517862",
     decimals: 6,
     category: "yield"
   },
@@ -162,7 +162,7 @@ const YIELD: CatalogAsset[] = [
     id: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
     name: "Infinity (LST index)",
     symbol: "INF",
-    iconUrl: "https://static.jup.ag/tokens/5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm/icon.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/18468/thumb/infSOL.png?1710325032",
     decimals: 9,
     category: "yield"
   }
@@ -181,7 +181,7 @@ const TOKEN: CatalogAsset[] = [
     id: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     name: "Bonk",
     symbol: "BONK",
-    iconUrl: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I",
+    iconUrl: "https://assets.coingecko.com/coins/images/28600/thumb/bonk.jpg?1696527587",
     decimals: 5,
     category: "token"
   },
@@ -197,7 +197,7 @@ const TOKEN: CatalogAsset[] = [
     id: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
     name: "Popcat",
     symbol: "POPCAT",
-    iconUrl: "https://bafkreibf3osopuq7qtcus7nkrmr2rsozp3tc2jl4f4mqmyvcbwyk6fqwm.ipfs.nftstorage.link",
+    iconUrl: "https://assets.coingecko.com/coins/images/33760/thumb/image.jpg?1702964227",
     decimals: 9,
     category: "token"
   },
@@ -205,7 +205,7 @@ const TOKEN: CatalogAsset[] = [
     id: "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",
     name: "cat in a dogs world",
     symbol: "MEW",
-    iconUrl: "https://metadata.jup.ag/metadata/mew.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/36440/thumb/MEW.png?1711442286",
     decimals: 5,
     category: "token"
   },
@@ -333,7 +333,7 @@ const TOKEN: CatalogAsset[] = [
     id: "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk",
     name: "Wen",
     symbol: "WEN",
-    iconUrl: "https://static.jup.ag/tokens/WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk/icon.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/34856/thumb/wen-logo-new.jpg?1741334229",
     decimals: 5,
     category: "token"
   },
@@ -341,7 +341,7 @@ const TOKEN: CatalogAsset[] = [
     id: "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
     name: "TRUMP",
     symbol: "TRUMP",
-    iconUrl: "https://metadata.jup.ag/metadata/trump.png",
+    iconUrl: "https://assets.coingecko.com/coins/images/53746/thumb/trump.png?1737171561",
     decimals: 6,
     category: "token"
   },

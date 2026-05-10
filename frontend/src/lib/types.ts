@@ -81,6 +81,8 @@ export type JupiterPlanLeg = {
   kind: string;
   symbol?: string;
   swapTransactionBase64?: string;
+  requestId?: string;
+  inputLamports?: number;
   expectedOutAmount?: string;
   minimumOutAmount?: string;
   outputMint?: string;
@@ -107,6 +109,16 @@ export type FeeTransferPlan = {
 export type JupiterInvestPlan = {
   legs: JupiterPlanLeg[];
   feeTransfer: FeeTransferPlan | null;
+  feeTransferSkippedReason?: string | null;
+  slippageBps?: number;
+  grossSol?: number;
+  userWallet?: string;
+  investorRequirements?: null | {
+    rentPerAtaLamports: number;
+    missingAtas: { mint: string; ata: string }[];
+    estimatedRentLamports: number;
+  };
+  note?: string;
 };
 
 export type DepositRow = {

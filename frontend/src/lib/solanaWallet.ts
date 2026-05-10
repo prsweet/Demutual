@@ -210,13 +210,10 @@ export async function walletSendSolTransfer(
     sendTransaction?(t: Transaction, c: Connection, o?: { preflightCommitment?: string }): Promise<string>;
     signTransaction?(t: Transaction): Promise<Transaction>;
   };
-  if (typeof p.signAndSendTransaction === "function") {
-    const out = await p.signAndSendTransaction(tx, connection);
-    return out.signature;
-  }
-  if (typeof p.sendTransaction === "function") {
-    return await p.sendTransaction(tx, connection, { preflightCommitment: "confirmed" });
-  }
+  // Backpack's sendTransaction/signAndSendTransaction may route via xnftdata rpc-proxy
+  // which can fail with CORS/403 in some environments. Prefer signing locally and
+  // sending via our own Connection RPC.
+  const isBackpack = Boolean((provider as InjectedSolanaWallet).isBackpack);
   if (typeof p.signTransaction === "function") {
     const signed = await p.signTransaction(tx);
     const sig = await connection.sendRawTransaction(signed.serialize(), { preflightCommitment: "confirmed" });
@@ -226,6 +223,13 @@ export async function walletSendSolTransfer(
       "confirmed"
     );
     return sig;
+  }
+  if (!isBackpack && typeof p.signAndSendTransaction === "function") {
+    const out = await p.signAndSendTransaction(tx, connection);
+    return out.signature;
+  }
+  if (!isBackpack && typeof p.sendTransaction === "function") {
+    return await p.sendTransaction(tx, connection, { preflightCommitment: "confirmed" });
   }
   throw new Error("WALLET_NO_TRANSACTION_SUPPORT");
 }
@@ -252,6 +256,20 @@ export async function signAndSendVersioned(
     "confirmed"
   );
   return sig;
+}
+
+export async function signVersionedTransactionToBase64(
+  provider: InjectedSolanaWallet,
+  vtx: VersionedTransaction
+): Promise<string> {
+  const signer = provider as InjectedSolanaWallet & {
+    signTransaction?(tx: VersionedTransaction): Promise<VersionedTransaction>;
+  };
+  if (typeof signer.signTransaction !== "function") {
+    throw new Error("WALLET_NO_SIGN_VERSIONED");
+  }
+  const signed = await signer.signTransaction(vtx);
+  return Buffer.from(signed.serialize()).toString("base64");
 }
 
 export async function signFeeTransfer(

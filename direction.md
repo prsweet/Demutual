@@ -17,3 +17,46 @@ We're building:
   projects; Demutual narrows on creator-issued, versioned mutual-fund-style
   portfolios with wallet auth, draft-to-publish fundraising, and transparent
   allocation history.”
+
+
+# **Technology reaches mainstream adoption when infrastructure becomes abstracted behind familiar user experiences** ~beautiful
+
+**Our Thinking** -> The next phase of Web3 adoption is not more primitives — it’s better financial interfaces
+
+# “people enter the Solana ecosystem knowingly or unknowingly” ~Kushal Goyal aka @prsweet
+
+  Most mainstream users do not care about:
+  
+  * RPCs,
+  * validator economics,
+  * SPL standards,
+  * DeFi composability.
+  
+  They care about:
+  
+  * “where do I put money?”
+  * “is it understandable?”
+  * “is it diversified?”
+  * “does it feel safer than buying random coins?” -> for a an investor new to web3
+
+  Most of the Solana ecosystem is optimized for:
+  
+  * traders,
+  * developers,
+  * degens,
+  * yield farmers,
+  * MEV/searchers,
+  * power users.
+  
+  New users entering crypto see:
+  
+  * wallets,
+  * bridges,
+  * swaps,
+  * staking,
+  * LPs,
+  * perps,
+  * liquidation risk,
+  * dozens of tokens.
+  
+  That’s overwhelming.

@@ -8,7 +8,9 @@ import {
   createBucketSchema,
   investInBucketSchema,
   jupiterInvestCompleteSchema,
+  jupiterExecuteSchema,
   jupiterInvestPlanSchema,
+  jupiterLegOrderSchema,
   jupiterSellCompleteSchema,
   jupiterSellPlanSchema,
   listBucketsQuerySchema,
@@ -40,6 +42,16 @@ export const bucketRoutes = new Elysia({ prefix: "/buckets" })
   .post("/:id/invest/jupiter-plan", jupiterInvestControllers.buildJupiterPlan, {
     beforeHandle: authMiddlewares.requireAuth,
     body: jupiterInvestPlanSchema,
+    params: idParamSchema
+  })
+  .post("/:id/invest/jupiter-leg-order", jupiterInvestControllers.buildJupiterLegOrder, {
+    beforeHandle: authMiddlewares.requireAuth,
+    body: jupiterLegOrderSchema,
+    params: idParamSchema
+  })
+  .post("/:id/invest/jupiter-execute", jupiterInvestControllers.executeJupiterOrder, {
+    beforeHandle: authMiddlewares.requireAuth,
+    body: jupiterExecuteSchema,
     params: idParamSchema
   })
   .post("/:id/invest/jupiter-complete", jupiterInvestControllers.completeJupiterInvest, {

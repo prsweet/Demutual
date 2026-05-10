@@ -45,6 +45,24 @@ export const jupiterInvestPlanSchema = t.Object({
 
 export type jupiterInvestPlanSchema = Static<typeof jupiterInvestPlanSchema>;
 
+/** Execute a signed Jupiter Meta-Aggregator order transaction. */
+export const jupiterExecuteSchema = t.Object({
+  signedTransaction: t.String({ minLength: 8 }),
+  requestId: t.String({ minLength: 1 }),
+  lastValidBlockHeight: t.Optional(t.Number({ minimum: 0 }))
+});
+
+export type jupiterExecuteSchema = Static<typeof jupiterExecuteSchema>;
+
+/** Build a *fresh* Jupiter order for a single leg right before the user signs (avoids blockhash expiry). */
+export const jupiterLegOrderSchema = t.Object({
+  outputMint: t.String({ minLength: 32, maxLength: 64 }),
+  lamports: t.Number({ exclusiveMinimum: 0 }),
+  slippageBps: t.Optional(t.Number({ minimum: 1, maximum: 5000 }))
+});
+
+export type jupiterLegOrderSchema = Static<typeof jupiterLegOrderSchema>;
+
 /** After the investor signs & sends each swap tx, record the round-trip. */
 export const jupiterInvestCompleteSchema = t.Object({
   solAmount: t.Number({ exclusiveMinimum: 0 }),

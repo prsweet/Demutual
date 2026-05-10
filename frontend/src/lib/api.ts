@@ -220,6 +220,60 @@ export async function postJupiterInvestComplete(
   return out.data;
 }
 
+export async function postJupiterLegOrder(
+  bucketId: string,
+  body: { outputMint: string; lamports: number; slippageBps?: number }
+): Promise<{
+  outputMint: string;
+  inputLamports: number;
+  slippageBps: number;
+  swapTransactionBase64: string;
+  requestId: string;
+  expectedOutAmount: string;
+  minimumOutAmount: string;
+}> {
+  const res = await api.post<
+    ApiResponse<{
+      outputMint: string;
+      inputLamports: number;
+      slippageBps: number;
+      swapTransactionBase64: string;
+      requestId: string;
+      expectedOutAmount: string;
+      minimumOutAmount: string;
+    }>
+  >(`/buckets/${encodeURIComponent(bucketId)}/invest/jupiter-leg-order`, body);
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_LEG_ORDER_FAILED");
+  return out.data;
+}
+
+export async function postJupiterInvestExecute(
+  bucketId: string,
+  body: { signedTransaction: string; requestId: string; lastValidBlockHeight?: number }
+): Promise<{
+  status: "Success" | "Failed";
+  signature: string;
+  code: number;
+  inputAmountResult: string;
+  outputAmountResult: string;
+  error?: string;
+}> {
+  const res = await api.post<
+    ApiResponse<{
+      status: "Success" | "Failed";
+      signature: string;
+      code: number;
+      inputAmountResult: string;
+      outputAmountResult: string;
+      error?: string;
+    }>
+  >(`/buckets/${encodeURIComponent(bucketId)}/invest/jupiter-execute`, body);
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_EXECUTE_FAILED");
+  return out.data;
+}
+
 export async function postJupiterSellPlan(
   bucketId: string,
   body: { solAmount: number; slippageBps?: number }
