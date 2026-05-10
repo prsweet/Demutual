@@ -17,6 +17,7 @@ import {
   type jupiterExecuteSchema,
   type jupiterInvestCompleteSchema,
   type jupiterInvestPlanSchema,
+  type jupiterLegOrderBatchSchema,
   type jupiterLegOrderSchema,
   response,
   type decoratedContext
@@ -479,9 +480,97 @@ const buildJupiterLegOrder = async ({
   }
 };
 
+/** Build fresh Jupiter orders for multiple legs in one request, keeping Jupiter `/order` rate-limit pressure on the server. */
+const buildJupiterLegOrdersBatch = async ({
+  params,
+  userId,
+  body
+}: decoratedContext<Context<{ params: { id: string }; body: jupiterLegOrderBatchSchema }>>) => {
+  try {
+    if (!userId) return status(401, response(false, null, errors.unauthorized401));
+    if (isDevnet()) {
+      return status(400, response(false, null, errors.jupiterDevnetUnsupported400));
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { walletAddress: true }
+    });
+    if (!user) return status(401, response(false, null, errors.unauthorized401));
+
+    const bucket = await prisma.bucket.findUnique({
+      where: { id: params.id },
+      include: { listing: true }
+    });
+    if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
+    if (bucket.type !== "PUBLISHED") {
+      return status(400, response(false, null, errors.bucketNotPublished400));
+    }
+
+    const slippageBps = body.slippageBps ?? 80;
+    const out: {
+      outputMint: string;
+      inputLamports: number;
+      slippageBps: number;
+      swapTransactionBase64: string;
+      requestId: string;
+      expectedOutAmount: string;
+      minimumOutAmount: string;
+    }[] = [];
+
+    for (let i = 0; i < body.legs.length; i++) {
+      const leg = body.legs[i]!;
+      const outMint = leg.outputMint.trim();
+      const lamports = Math.floor(Number(leg.lamports));
+      if (!outMint || !Number.isFinite(lamports) || lamports <= 0) {
+        return status(400, response(false, null, errors.typeBox400));
+      }
+      if (outMint === WSOL_MINT) {
+        return status(400, response(false, null, errors.jupiterPlan400));
+      }
+      if (!bucket.listing.some((l) => l.assetId === outMint)) {
+        return status(400, response(false, null, errors.jupiterPlan400));
+      }
+
+      try {
+        const order = await jupiterOrder({
+          inputMint: WSOL_MINT,
+          outputMint: outMint,
+          amountLamports: lamports,
+          slippageBps,
+          taker: user.walletAddress
+        });
+        out.push({
+          outputMint: outMint,
+          inputLamports: lamports,
+          slippageBps,
+          swapTransactionBase64: order.transaction,
+          requestId: order.requestId,
+          expectedOutAmount: order.outAmount,
+          minimumOutAmount: order.otherAmountThreshold || "0"
+        });
+      } catch (e) {
+        console.error("[buildJupiterLegOrdersBatch leg]", outMint, e);
+        return status(400, response(false, null, errors.jupiterPlan400));
+      }
+
+      // Rate-limit guard for Jupiter `/order` on free tier.
+      if (i < body.legs.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+    }
+
+    return status(200, response(true, toJsonSafe({ legs: out, slippageBps }), null));
+  } catch (e) {
+    console.error("[buildJupiterLegOrdersBatch]", e);
+    return status(400, response(false, null, errors.jupiterPlan400));
+  }
+};
+
 export const jupiterInvestControllers = {
   buildJupiterPlan,
   buildJupiterLegOrder,
+  buildJupiterLegOrdersBatch,
   executeJupiterOrder: async ({
     userId,
     body

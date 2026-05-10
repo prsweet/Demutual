@@ -17,6 +17,7 @@ import {
   postJupiterInvestComplete,
   postJupiterInvestExecute,
   postJupiterLegOrder,
+  postJupiterLegOrdersBatch,
   postJupiterInvestPlan,
   postJupiterSellComplete,
   postJupiterSellPlan,
@@ -28,7 +29,9 @@ import {
   describeFee,
   getConnectedAddress,
   getConnectedProvider,
+  sendAndConfirmSignedB64Parallel,
   signAndSendVersioned,
+  signAllVersionedTransactionsToBase64,
   signVersionedTransactionToBase64,
   signFeeTransfer,
   solToLamports,
@@ -268,30 +271,48 @@ export function BucketDetailPage() {
         setBusy(`Fee: ${describeFee(plan.feeTransfer)} — sign in wallet…`);
         feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
       }
-      const sigs: string[] = [];
       const slippageBps = plan.slippageBps ?? 80;
-      for (let i = 0; i < swaps.length; i++) {
-        const leg = swaps[i]!;
-        setBusy(`Swap ${i + 1}/${swaps.length} (${leg.symbol ?? "token"})…`);
-        // Fetch a *fresh* Jupiter order right before signing so the blockhash is current.
-        // Jupiter `/order` transactions expire in ~60s, which is why earlier leg(s) can land
-        // and later ones expire while the user is still signing.
-        const fresh = await postJupiterLegOrder(bucket.id, {
-          outputMint: leg.outputMint,
-          lamports: leg.inputLamports,
-          slippageBps
-        });
-        const vtx = VersionedTransaction.deserialize(b64ToUint8Array(fresh.swapTransactionBase64));
-        const signedTransaction = await signVersionedTransactionToBase64(provider, vtx);
-        const exec = await postJupiterInvestExecute(bucket.id, {
-          signedTransaction,
-          requestId: fresh.requestId
-        });
-        if (exec.status !== "Success") {
-          throw new Error(exec.error || `JUPITER_EXECUTE_FAILED_${exec.code}`);
-        }
-        sigs.push(exec.signature);
+
+      // Build fresh Jupiter orders for ALL legs in one server round-trip (server keeps the
+      // 600ms gap between Jupiter `/order` calls so the rate-limit pressure is unchanged).
+      setBusy(`Building ${swaps.length} fresh swap orders…`);
+      const batch = await postJupiterLegOrdersBatch(bucket.id, {
+        legs: swaps.map((s) => ({ outputMint: s.outputMint, lamports: s.inputLamports })),
+        slippageBps
+      });
+
+      // Single wallet popup signs ALL legs at once via signAllTransactions.
+      setBusy(`Sign ${batch.legs.length} swaps in wallet…`);
+      const vtxs = batch.legs.map((b) =>
+        VersionedTransaction.deserialize(b64ToUint8Array(b.swapTransactionBase64))
+      );
+      const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+
+      // Send all to Jupiter `/execute` in parallel (it has its own dedicated rate-limit bucket).
+      setBusy(`Executing ${batch.legs.length} swaps via Jupiter…`);
+      const execResults = await Promise.all(
+        batch.legs.map((leg, i) =>
+          postJupiterInvestExecute(bucket.id, {
+            signedTransaction: signedB64[i]!,
+            requestId: leg.requestId
+          })
+        )
+      );
+
+      const failed = execResults
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => r.status !== "Success");
+      if (failed.length > 0) {
+        const f = failed[0]!;
+        const symbol = swaps[f.i]?.symbol ?? `leg ${f.i + 1}`;
+        throw new Error(
+          f.r.error
+            ? `${symbol}: ${f.r.error}`
+            : `${symbol}: JUPITER_EXECUTE_FAILED_${f.r.code}`
+        );
       }
+      const sigs: string[] = execResults.map((r) => r.signature);
+
       setBusy("Recording TVL…");
       await postJupiterInvestComplete(bucket.id, {
         solAmount: amount,
@@ -343,19 +364,25 @@ export function BucketDetailPage() {
       }
       const jupRpc = getJupiterSubmitRpcUrl();
       const connection = new Connection(jupRpc, "confirmed");
-      const sigs: string[] = [];
-      for (let i = 0; i < swaps.length; i++) {
-        const leg = swaps[i]!;
-        setBusy(`Sell ${i + 1}/${swaps.length} (${leg.symbol ?? "token"})…`);
-        const vtx = VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64));
-        const sig = await signAndSendVersioned(provider, connection, vtx);
-        sigs.push(sig);
-      }
+
+      // Optional fee transfer (sell flow currently doesn't have one but supports it).
       let feeTransferSignature: string | undefined;
       if (plan.feeTransfer && plan.feeTransfer.splits.length > 0) {
-        setBusy(`Fee: ${describeFee(plan.feeTransfer)}…`);
+        setBusy(`Fee: ${describeFee(plan.feeTransfer)} — sign in wallet…`);
         feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
       }
+
+      // Single wallet popup signs ALL sell legs at once.
+      setBusy(`Sign ${swaps.length} sells in wallet…`);
+      const vtxs = swaps.map((leg) =>
+        VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
+      );
+      const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+
+      // Send and confirm all in parallel via the configured RPC.
+      setBusy(`Submitting ${swaps.length} sells to Solana…`);
+      const sigs = await sendAndConfirmSignedB64Parallel(connection, signedB64);
+
       setBusy("Recording withdrawal…");
       await postJupiterSellComplete(bucket.id, {
         solAmount: amount,
@@ -366,7 +393,7 @@ export function BucketDetailPage() {
       await loadPosition();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(errHint(msg) || msg);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
     } finally {
       setBusy(null);
     }

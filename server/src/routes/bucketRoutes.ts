@@ -11,6 +11,7 @@ import {
   jupiterExecuteSchema,
   jupiterInvestPlanSchema,
   jupiterLegOrderSchema,
+  jupiterLegOrderBatchSchema,
   jupiterSellCompleteSchema,
   jupiterSellPlanSchema,
   listBucketsQuerySchema,
@@ -47,6 +48,11 @@ export const bucketRoutes = new Elysia({ prefix: "/buckets" })
   .post("/:id/invest/jupiter-leg-order", jupiterInvestControllers.buildJupiterLegOrder, {
     beforeHandle: authMiddlewares.requireAuth,
     body: jupiterLegOrderSchema,
+    params: idParamSchema
+  })
+  .post("/:id/invest/jupiter-leg-orders-batch", jupiterInvestControllers.buildJupiterLegOrdersBatch, {
+    beforeHandle: authMiddlewares.requireAuth,
+    body: jupiterLegOrderBatchSchema,
     params: idParamSchema
   })
   .post("/:id/invest/jupiter-execute", jupiterInvestControllers.executeJupiterOrder, {

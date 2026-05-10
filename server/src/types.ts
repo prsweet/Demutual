@@ -63,6 +63,20 @@ export const jupiterLegOrderSchema = t.Object({
 
 export type jupiterLegOrderSchema = Static<typeof jupiterLegOrderSchema>;
 
+/** Build fresh Jupiter orders for many legs in one request — keeps Jupiter `/order` rate-limit pressure server-side. */
+export const jupiterLegOrderBatchSchema = t.Object({
+  legs: t.Array(
+    t.Object({
+      outputMint: t.String({ minLength: 32, maxLength: 64 }),
+      lamports: t.Number({ exclusiveMinimum: 0 })
+    }),
+    { minItems: 1, maxItems: 10 }
+  ),
+  slippageBps: t.Optional(t.Number({ minimum: 1, maximum: 5000 }))
+});
+
+export type jupiterLegOrderBatchSchema = Static<typeof jupiterLegOrderBatchSchema>;
+
 /** After the investor signs & sends each swap tx, record the round-trip. */
 export const jupiterInvestCompleteSchema = t.Object({
   solAmount: t.Number({ exclusiveMinimum: 0 }),

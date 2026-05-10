@@ -24,6 +24,7 @@ export interface InjectedSolanaWallet {
   signMessage(message: Uint8Array, second?: unknown): Promise<Uint8Array | { signature: Uint8Array } | string>;
   signTransaction?(transaction: Transaction): Promise<Transaction>;
   signTransaction?(transaction: VersionedTransaction): Promise<VersionedTransaction>;
+  signAllTransactions?(transactions: VersionedTransaction[]): Promise<VersionedTransaction[]>;
   signAndSendTransaction?(transaction: Transaction, connection: Connection): Promise<{ signature: string }>;
   sendTransaction?(
     transaction: Transaction,
@@ -270,6 +271,77 @@ export async function signVersionedTransactionToBase64(
   }
   const signed = await signer.signTransaction(vtx);
   return Buffer.from(signed.serialize()).toString("base64");
+}
+
+/**
+ * Send many already-signed (base64) versioned transactions in parallel and poll
+ * for confirmation. Throws on the first transaction failure.
+ */
+export async function sendAndConfirmSignedB64Parallel(
+  connection: Connection,
+  signedB64Txs: string[],
+  opts?: { timeoutMs?: number; pollIntervalMs?: number }
+): Promise<string[]> {
+  if (signedB64Txs.length === 0) return [];
+  const sigs = await Promise.all(
+    signedB64Txs.map((b64) =>
+      connection.sendRawTransaction(b64ToUint8Array(b64), {
+        maxRetries: 3,
+        preflightCommitment: "confirmed"
+      })
+    )
+  );
+
+  const timeout = opts?.timeoutMs ?? 60_000;
+  const interval = opts?.pollIntervalMs ?? 1500;
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    const statuses = await connection.getSignatureStatuses(sigs);
+    const value = statuses.value;
+    const failedIdx = value.findIndex((s) => s?.err);
+    if (failedIdx >= 0) {
+      throw new Error(
+        `TX_FAILED:${sigs[failedIdx]}: ${JSON.stringify(value[failedIdx]?.err)}`
+      );
+    }
+    const allConfirmed = value.every(
+      (s) => s !== null && (s.confirmationStatus === "confirmed" || s.confirmationStatus === "finalized")
+    );
+    if (allConfirmed) return sigs;
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error("TX_CONFIRMATION_TIMEOUT");
+}
+
+/**
+ * Sign multiple versioned transactions in a single wallet popup.
+ * Falls back to sequential `signTransaction` calls if the wallet doesn't expose `signAllTransactions`.
+ */
+export async function signAllVersionedTransactionsToBase64(
+  provider: InjectedSolanaWallet,
+  vtxs: VersionedTransaction[]
+): Promise<string[]> {
+  const signer = provider as InjectedSolanaWallet & {
+    signAllTransactions?(txs: VersionedTransaction[]): Promise<VersionedTransaction[]>;
+    signTransaction?(tx: VersionedTransaction): Promise<VersionedTransaction>;
+  };
+  if (vtxs.length === 0) return [];
+
+  if (typeof signer.signAllTransactions === "function") {
+    const signed = await signer.signAllTransactions(vtxs);
+    return signed.map((s) => Buffer.from(s.serialize()).toString("base64"));
+  }
+
+  if (typeof signer.signTransaction !== "function") {
+    throw new Error("WALLET_NO_SIGN_VERSIONED");
+  }
+  const out: string[] = [];
+  for (const vtx of vtxs) {
+    const signed = await signer.signTransaction(vtx);
+    out.push(Buffer.from(signed.serialize()).toString("base64"));
+  }
+  return out;
 }
 
 export async function signFeeTransfer(

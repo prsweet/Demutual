@@ -248,6 +248,40 @@ export async function postJupiterLegOrder(
   return out.data;
 }
 
+export async function postJupiterLegOrdersBatch(
+  bucketId: string,
+  body: { legs: { outputMint: string; lamports: number }[]; slippageBps?: number }
+): Promise<{
+  slippageBps: number;
+  legs: {
+    outputMint: string;
+    inputLamports: number;
+    slippageBps: number;
+    swapTransactionBase64: string;
+    requestId: string;
+    expectedOutAmount: string;
+    minimumOutAmount: string;
+  }[];
+}> {
+  const res = await api.post<
+    ApiResponse<{
+      slippageBps: number;
+      legs: {
+        outputMint: string;
+        inputLamports: number;
+        slippageBps: number;
+        swapTransactionBase64: string;
+        requestId: string;
+        expectedOutAmount: string;
+        minimumOutAmount: string;
+      }[];
+    }>
+  >(`/buckets/${encodeURIComponent(bucketId)}/invest/jupiter-leg-orders-batch`, body);
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_LEG_ORDERS_BATCH_FAILED");
+  return out.data;
+}
+
 export async function postJupiterInvestExecute(
   bucketId: string,
   body: { signedTransaction: string; requestId: string; lastValidBlockHeight?: number }
