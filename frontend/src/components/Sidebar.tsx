@@ -13,7 +13,7 @@ export function Sidebar({ user }: { user?: LayoutUser }) {
   const navigate = useNavigate();
 
   return (
-    <aside className="w-[280px] h-screen flex-shrink-0 flex flex-col border-r border-black/5 bg-[#eaebe9] p-4 text-[#1a1c1e] tracking-tight">
+    <aside className="w-[280px] h-screen shrink-0 flex flex-col border-r border-black/5 bg-[#eaebe9] p-4 text-[#1a1c1e] tracking-tight">
       <div className="flex items-center gap-3 mb-5 px-2">
         <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-[inset_0_1px_1px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.05)] border border-black/5">
           <User2 className="w-5 h-5 text-gray-500" />

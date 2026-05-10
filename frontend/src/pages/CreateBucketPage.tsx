@@ -222,7 +222,7 @@ export function CreateBucketPage() {
         </button>
 
         <div
-          className="bg-[#f8f9f7] rounded-[1.5rem] p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)] space-y-10"
+          className="bg-[#f8f9f7] rounded-3xl p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)] space-y-10"
         >
           <div>
             <h1 className="text-[24px] font-semibold text-[#1a1c1e] tracking-tight mb-2">Create bucket</h1>
@@ -306,7 +306,7 @@ export function CreateBucketPage() {
           )}
 
           <div
-            className="rounded-[1rem] p-5 bg-white border border-black/8 shadow-[inset_0_2px_1px_rgba(255,255,255,0.9),0_2px_8px_rgba(0,0,0,0.04)] space-y-4"
+            className="rounded-2xl p-5 bg-white border border-black/8 shadow-[inset_0_2px_1px_rgba(255,255,255,0.9),0_2px_8px_rgba(0,0,0,0.04)] space-y-4"
           >
             <div className="flex items-center gap-2">
               <Plus className="w-4 h-4 text-[#6b7280]" />

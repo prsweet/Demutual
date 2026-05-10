@@ -90,7 +90,7 @@ export function Dashboard() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="h-[220px] rounded-[1rem] bg-[#f8f9f7] animate-pulse
+                className="h-[220px] rounded-2xl bg-[#f8f9f7] animate-pulse
                 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.05)]"
               />
             ))}

@@ -39,7 +39,7 @@ export function BucketCard({
           open();
         }
       }}
-      className="w-full rounded-[1rem] p-5 text-left bg-[#f8f9f7]
+      className="w-full rounded-2xl p-5 text-left bg-[#f8f9f7]
       shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.05),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)]
       hover:shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.12),0_16px_32px_-4px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.04)]
       transition-all cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-[#1a1c1e]/20 focus-visible:ring-offset-2"
@@ -51,7 +51,7 @@ export function BucketCard({
         <h2 className="text-[17px] font-semibold text-[#1a1c1e] tracking-tight truncate">{title}</h2>
       </div>
 
-      <p className="text-[15px] text-[#6b7280] font-medium tracking-tight mb-1 line-clamp-2 min-h-[2.5rem]">{description}</p>
+      <p className="text-[15px] text-[#6b7280] font-medium tracking-tight mb-1 line-clamp-2 min-h-10">{description}</p>
 
       <div className="h-px w-[calc(100%+40px)] -ml-5 my-4 bg-black/5 shadow-[0_1.5px_0_white]" />
 

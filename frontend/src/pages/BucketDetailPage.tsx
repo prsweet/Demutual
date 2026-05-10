@@ -356,7 +356,7 @@ export function BucketDetailPage() {
 
         {bucket && !loading && (
           <div
-            className="bg-[#f8f9f7] rounded-[1.5rem] p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08),0_12px_24px_-4px_rgba(0,0,0,0.05)]"
+            className="bg-[#f8f9f7] rounded-3xl p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08),0_12px_24px_-4px_rgba(0,0,0,0.05)]"
           >
             <h1 className="text-[24px] font-semibold text-[#1a1c1e] mb-1">{bucket.name}</h1>
             <p className="text-[13px] text-[#6b7280] font-mono mb-4 break-all">id: {bucket.id}</p>

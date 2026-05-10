@@ -134,7 +134,7 @@ export function PortfolioPage() {
 
         {isDevnet && (
           <div
-            className="rounded-[1rem] p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
+            className="rounded-2xl p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
           >
             <h2 className="text-[16px] font-semibold text-[#1a1c1e] mb-2">Devnet SOL</h2>
             <p className="text-[13px] text-[#6b7280] mb-4">
@@ -155,7 +155,7 @@ export function PortfolioPage() {
         )}
 
         <div
-          className="rounded-[1rem] p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
+          className="rounded-2xl p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
         >
           <div className="flex items-center justify-between gap-4 mb-4">
             <h2 className="text-[16px] font-semibold text-[#1a1c1e]">My deposits</h2>
@@ -213,7 +213,7 @@ export function PortfolioPage() {
         </div>
 
         <div
-          className="rounded-[1rem] p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
+          className="rounded-2xl p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
         >
           <h2 className="text-[16px] font-semibold text-[#1a1c1e] mb-2">Ledger withdraw</h2>
           <p className="text-[13px] text-[#6b7280] mb-4">

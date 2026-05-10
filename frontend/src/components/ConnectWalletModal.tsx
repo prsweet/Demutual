@@ -126,7 +126,7 @@ export function ConnectWalletModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm tracking-tight p-4">
       <div
-        className="w-full max-w-sm bg-[#f8f9f7] rounded-[1.5rem] p-6 shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),0_24px_48px_-12px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.05)] relative overflow-hidden"
+        className="w-full max-w-sm bg-[#f8f9f7] rounded-3xl p-6 shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),0_24px_48px_-12px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.05)] relative overflow-hidden"
       >
         <button
           type="button"

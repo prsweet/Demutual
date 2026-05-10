@@ -107,7 +107,7 @@ export function MyBucketsPage() {
         ) : (
           <>
             <section
-              className="rounded-[1rem] p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
+              className="rounded-2xl p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
             >
               <h2 className="text-[16px] font-semibold text-[#1a1c1e] mb-4">Drafts</h2>
               {drafts.length === 0 ? (
@@ -148,7 +148,7 @@ export function MyBucketsPage() {
             </section>
 
             <section
-              className="rounded-[1rem] p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
+              className="rounded-2xl p-6 bg-[#f8f9f7] shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08)]"
             >
               <h2 className="text-[16px] font-semibold text-[#1a1c1e] mb-4">Published</h2>
               {published.length === 0 ? (
