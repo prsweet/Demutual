@@ -259,6 +259,82 @@ export type EnumBucketTypeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumBucketTypeFilter<$PrismaModel>
 }
 
+export type EnumBasketDirectionFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketDirection | Prisma.EnumBasketDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketDirectionFilter<$PrismaModel> | $Enums.BasketDirection
+}
+
+export type EnumBasketAttemptStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketAttemptStatus | Prisma.EnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketAttemptStatusFilter<$PrismaModel> | $Enums.BasketAttemptStatus
+}
+
+export type DateTimeNullableFilter<$PrismaModel = never> = {
+  equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
+  in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  notIn?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  lt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  lte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+}
+
+export type EnumBasketDirectionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketDirection | Prisma.EnumBasketDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketDirectionWithAggregatesFilter<$PrismaModel> | $Enums.BasketDirection
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBasketDirectionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBasketDirectionFilter<$PrismaModel>
+}
+
+export type EnumBasketAttemptStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketAttemptStatus | Prisma.EnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketAttemptStatusWithAggregatesFilter<$PrismaModel> | $Enums.BasketAttemptStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBasketAttemptStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBasketAttemptStatusFilter<$PrismaModel>
+}
+
+export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
+  in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  notIn?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  lt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  lte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
+}
+
+export type EnumBasketLegStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketLegStatus | Prisma.EnumBasketLegStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketLegStatusFilter<$PrismaModel> | $Enums.BasketLegStatus
+}
+
+export type EnumBasketLegStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketLegStatus | Prisma.EnumBasketLegStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketLegStatusWithAggregatesFilter<$PrismaModel> | $Enums.BasketLegStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBasketLegStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBasketLegStatusFilter<$PrismaModel>
+}
+
 export type BoolFilter<$PrismaModel = never> = {
   equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
   not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
@@ -501,6 +577,82 @@ export type NestedEnumBucketTypeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumBucketTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumBucketTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumBasketDirectionFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketDirection | Prisma.EnumBasketDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketDirectionFilter<$PrismaModel> | $Enums.BasketDirection
+}
+
+export type NestedEnumBasketAttemptStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketAttemptStatus | Prisma.EnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketAttemptStatusFilter<$PrismaModel> | $Enums.BasketAttemptStatus
+}
+
+export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
+  equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
+  in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  notIn?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  lt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  lte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+}
+
+export type NestedEnumBasketDirectionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketDirection | Prisma.EnumBasketDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketDirection[] | Prisma.ListEnumBasketDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketDirectionWithAggregatesFilter<$PrismaModel> | $Enums.BasketDirection
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBasketDirectionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBasketDirectionFilter<$PrismaModel>
+}
+
+export type NestedEnumBasketAttemptStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketAttemptStatus | Prisma.EnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketAttemptStatus[] | Prisma.ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketAttemptStatusWithAggregatesFilter<$PrismaModel> | $Enums.BasketAttemptStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBasketAttemptStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBasketAttemptStatusFilter<$PrismaModel>
+}
+
+export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
+  in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  notIn?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
+  lt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  lte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gt?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  gte?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumBasketLegStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketLegStatus | Prisma.EnumBasketLegStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketLegStatusFilter<$PrismaModel> | $Enums.BasketLegStatus
+}
+
+export type NestedEnumBasketLegStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BasketLegStatus | Prisma.EnumBasketLegStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BasketLegStatus[] | Prisma.ListEnumBasketLegStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBasketLegStatusWithAggregatesFilter<$PrismaModel> | $Enums.BasketLegStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBasketLegStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBasketLegStatusFilter<$PrismaModel>
 }
 
 export type NestedBoolFilter<$PrismaModel = never> = {

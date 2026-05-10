@@ -13,15 +13,22 @@ import { useAuth } from "../context/AuthContext";
 import { useServerConfig } from "../context/ServerConfigContext";
 import {
   fetchBucketById,
+  fetchMyAttempts,
   fetchMyPosition,
+  postAttemptAbandon,
+  postJupiterAttemptResume,
   postJupiterInvestComplete,
   postJupiterInvestExecute,
   postJupiterLegOrder,
   postJupiterLegOrdersBatch,
   postJupiterInvestPlan,
+  postJupiterSellAttemptResume,
   postJupiterSellComplete,
   postJupiterSellPlan,
-  postTreasuryInvest
+  postTreasuryInvest,
+  type AttemptOrderLeg,
+  type BasketAttemptRow,
+  type BasketLegResult
 } from "../lib/api";
 import type { ApiBucket, JupiterPlanLeg } from "../lib/types";
 import {
@@ -101,6 +108,18 @@ export function BucketDetailPage() {
   const [sellSol, setSellSol] = useState("0.01");
   const [busy, setBusy] = useState<string | null>(null);
 
+  /** Resumable basket attempts (PENDING / PARTIAL) for THIS bucket. */
+  const [resumableAttempts, setResumableAttempts] = useState<BasketAttemptRow[]>([]);
+  /** Last partial-fill summary surfaced from the most recent buy/sell run. */
+  const [partialResult, setPartialResult] = useState<{
+    direction: "BUY" | "SELL";
+    attemptId: string;
+    successCount: number;
+    failedCount: number;
+    pendingCount: number;
+    legs: { legId: string; symbol?: string | null; status: string; lastError?: string | null }[];
+  } | null>(null);
+
   const id = routeId?.trim() ?? "";
 
   const load = useCallback(async () => {
@@ -145,6 +164,27 @@ export function BucketDetailPage() {
       setPosition(null);
     }
   };
+
+  const loadResumableAttempts = useCallback(async () => {
+    if (!user || !id) return;
+    try {
+      const [pending, partial] = await Promise.all([
+        fetchMyAttempts({ bucketId: id, status: "PENDING", limit: 10 }),
+        fetchMyAttempts({ bucketId: id, status: "PARTIAL", limit: 10 })
+      ]);
+      const combined = [...partial.data, ...pending.data].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+      setResumableAttempts(combined);
+    } catch (e) {
+      console.warn("[loadResumableAttempts]", e);
+      setResumableAttempts([]);
+    }
+  }, [user, id]);
+
+  useEffect(() => {
+    void loadResumableAttempts();
+  }, [loadResumableAttempts]);
 
   const onTreasuryInvest = async () => {
     if (!bucket || !published || !user) {
@@ -236,6 +276,67 @@ export function BucketDetailPage() {
     }
   };
 
+  /** Executes a freshly-signed batch of Jupiter buy legs, then reports per-leg outcomes
+   * to the server. Used both for the initial buy and for "Resume" of a partial attempt.
+   */
+  const runBuyLegs = async (params: {
+    attemptId: string;
+    legs: AttemptOrderLeg[];
+    feeTransferSignature?: string;
+  }): Promise<{
+    attemptStatus: "PENDING" | "PARTIAL" | "COMPLETE" | "ABANDONED";
+    legs: BasketLegResult[];
+  }> => {
+    const provider = getConnectedProvider();
+    if (!provider || !walletAddr || !bucket) {
+      throw new Error("Wallet disconnected — connect and retry.");
+    }
+
+    setBusy(`Sign ${params.legs.length} swap${params.legs.length === 1 ? "" : "s"} in wallet…`);
+    const vtxs = params.legs.map((b) =>
+      VersionedTransaction.deserialize(b64ToUint8Array(b.swapTransactionBase64))
+    );
+    const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+
+    setBusy(`Executing ${params.legs.length} swap${params.legs.length === 1 ? "" : "s"} via Jupiter…`);
+    const execResults = await Promise.allSettled(
+      params.legs.map((leg, i) =>
+        postJupiterInvestExecute(bucket.id, {
+          signedTransaction: signedB64[i]!,
+          requestId: leg.requestId
+        })
+      )
+    );
+
+    const legResults: BasketLegResult[] = params.legs.map((leg, i) => {
+      const r = execResults[i]!;
+      if (r.status === "fulfilled") {
+        if (r.value.status === "Success" && r.value.signature) {
+          return { legId: leg.legId, status: "SUCCESS", signature: r.value.signature };
+        }
+        return {
+          legId: leg.legId,
+          status: "FAILED",
+          error: r.value.error || `JUPITER_EXECUTE_FAILED_${r.value.code}`
+        };
+      }
+      return {
+        legId: leg.legId,
+        status: "FAILED",
+        error: r.reason instanceof Error ? r.reason.message : String(r.reason)
+      };
+    });
+
+    setBusy("Recording on-chain results…");
+    const completed = await postJupiterInvestComplete(bucket.id, {
+      attemptId: params.attemptId,
+      legs: legResults,
+      ...(params.feeTransferSignature ? { feeTransferSignature: params.feeTransferSignature } : {})
+    });
+
+    return { attemptStatus: completed.attemptStatus, legs: legResults };
+  };
+
   const executeJupiterBuyPlan = async () => {
     if (!jupiterBuyPlan || !bucket || !user) return;
     const provider = getConnectedProvider();
@@ -243,10 +344,11 @@ export function BucketDetailPage() {
 
     const plan = jupiterBuyPlan;
     const amount = parseFloat(jupiterSol);
-    
+
     setBusy("Initializing execution…");
     setError(null);
-    
+    setPartialResult(null);
+
     try {
       const swaps = plan.legs.filter(
         (l): l is JupiterPlanLeg & {
@@ -273,61 +375,163 @@ export function BucketDetailPage() {
       }
       const slippageBps = plan.slippageBps ?? 80;
 
-      // Build fresh Jupiter orders for ALL legs in one server round-trip (server keeps the
-      // 600ms gap between Jupiter `/order` calls so the rate-limit pressure is unchanged).
+      // Server creates a BasketAttempt + per-leg rows here.
       setBusy(`Building ${swaps.length} fresh swap orders…`);
       const batch = await postJupiterLegOrdersBatch(bucket.id, {
         legs: swaps.map((s) => ({ outputMint: s.outputMint, lamports: s.inputLamports })),
-        slippageBps
+        slippageBps,
+        intendedSol: amount
       });
 
-      // Single wallet popup signs ALL legs at once via signAllTransactions.
-      setBusy(`Sign ${batch.legs.length} swaps in wallet…`);
-      const vtxs = batch.legs.map((b) =>
-        VersionedTransaction.deserialize(b64ToUint8Array(b.swapTransactionBase64))
-      );
-      const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
-
-      // Send all to Jupiter `/execute` in parallel (it has its own dedicated rate-limit bucket).
-      setBusy(`Executing ${batch.legs.length} swaps via Jupiter…`);
-      const execResults = await Promise.all(
-        batch.legs.map((leg, i) =>
-          postJupiterInvestExecute(bucket.id, {
-            signedTransaction: signedB64[i]!,
-            requestId: leg.requestId
-          })
-        )
-      );
-
-      const failed = execResults
-        .map((r, i) => ({ r, i }))
-        .filter(({ r }) => r.status !== "Success");
-      if (failed.length > 0) {
-        const f = failed[0]!;
-        const symbol = swaps[f.i]?.symbol ?? `leg ${f.i + 1}`;
-        throw new Error(
-          f.r.error
-            ? `${symbol}: ${f.r.error}`
-            : `${symbol}: JUPITER_EXECUTE_FAILED_${f.r.code}`
-        );
-      }
-      const sigs: string[] = execResults.map((r) => r.signature);
-
-      setBusy("Recording TVL…");
-      await postJupiterInvestComplete(bucket.id, {
-        solAmount: amount,
-        transactionSignatures: sigs,
+      const { attemptStatus, legs: legResults } = await runBuyLegs({
+        attemptId: batch.attemptId,
+        legs: batch.legs,
         ...(feeTransferSignature ? { feeTransferSignature } : {})
       });
+
+      if (attemptStatus !== "COMPLETE") {
+        setPartialResult({
+          direction: "BUY",
+          attemptId: batch.attemptId,
+          successCount: legResults.filter((l) => l.status === "SUCCESS").length,
+          failedCount: legResults.filter((l) => l.status === "FAILED").length,
+          pendingCount: 0,
+          legs: legResults.map((r) => {
+            const order = batch.legs.find((l) => l.legId === r.legId);
+            return {
+              legId: r.legId,
+              symbol: order?.symbol ?? null,
+              status: r.status,
+              lastError: r.error ?? null
+            };
+          })
+        });
+      }
       setJupiterBuyPlan(null);
       await load();
       await loadPosition();
+      await loadResumableAttempts();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(hintIfRentError(msg) || errHint(msg) || msg);
     } finally {
       setBusy(null);
     }
+  };
+
+  /** Resume the missing legs of a buy-direction attempt. */
+  const resumeBuyAttempt = async (attemptId: string) => {
+    if (!bucket || !user) return;
+    setBusy("Re-quoting missing legs…");
+    setError(null);
+    setPartialResult(null);
+    try {
+      const resume = await postJupiterAttemptResume(bucket.id, attemptId);
+      if (resume.legs.length === 0) {
+        setError("Nothing to resume — all legs already settled.");
+        setBusy(null);
+        return;
+      }
+      const { attemptStatus, legs: legResults } = await runBuyLegs({
+        attemptId,
+        legs: resume.legs
+        // resume never re-charges fees
+      });
+      if (attemptStatus !== "COMPLETE") {
+        setPartialResult({
+          direction: "BUY",
+          attemptId,
+          successCount: legResults.filter((l) => l.status === "SUCCESS").length,
+          failedCount: legResults.filter((l) => l.status === "FAILED").length,
+          pendingCount: 0,
+          legs: legResults.map((r) => {
+            const order = resume.legs.find((l) => l.legId === r.legId);
+            return {
+              legId: r.legId,
+              symbol: order?.symbol ?? null,
+              status: r.status,
+              lastError: r.error ?? null
+            };
+          })
+        });
+      }
+      await load();
+      await loadPosition();
+      await loadResumableAttempts();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const abandonAttemptHandler = async (attemptId: string) => {
+    setBusy("Abandoning…");
+    setError(null);
+    try {
+      await postAttemptAbandon(attemptId);
+      setPartialResult(null);
+      await loadResumableAttempts();
+      await loadPosition();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(errHint(msg) || msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Sign + submit + confirm a batch of sell legs in parallel, then report per-leg outcomes. */
+  const runSellLegs = async (params: {
+    attemptId: string;
+    legs: { legId: string; symbol?: string | null; swapTransactionBase64: string }[];
+    feeTransferSignature?: string;
+  }): Promise<{
+    attemptStatus: "PENDING" | "PARTIAL" | "COMPLETE" | "ABANDONED";
+    legs: BasketLegResult[];
+  }> => {
+    const provider = getConnectedProvider();
+    if (!provider || !walletAddr || !bucket) {
+      throw new Error("Wallet disconnected — connect and retry.");
+    }
+
+    const jupRpc = getJupiterSubmitRpcUrl();
+    const connection = new Connection(jupRpc, "confirmed");
+
+    setBusy(`Sign ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} in wallet…`);
+    const vtxs = params.legs.map((leg) =>
+      VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
+    );
+    const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+
+    setBusy(`Submitting ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} to Solana…`);
+    const settled = await Promise.allSettled(
+      signedB64.map((b64) => sendAndConfirmSignedB64Parallel(connection, [b64]))
+    );
+
+    const legResults: BasketLegResult[] = params.legs.map((leg, i) => {
+      const r = settled[i]!;
+      if (r.status === "fulfilled" && r.value[0]) {
+        return { legId: leg.legId, status: "SUCCESS", signature: r.value[0] };
+      }
+      const err =
+        r.status === "rejected"
+          ? r.reason instanceof Error
+            ? r.reason.message
+            : String(r.reason)
+          : "UNKNOWN_SELL_FAILURE";
+      return { legId: leg.legId, status: "FAILED", error: err };
+    });
+
+    setBusy("Recording withdrawal…");
+    const completed = await postJupiterSellComplete(bucket.id, {
+      attemptId: params.attemptId,
+      legs: legResults,
+      ...(params.feeTransferSignature ? { feeTransferSignature: params.feeTransferSignature } : {})
+    });
+
+    return { attemptStatus: completed.attemptStatus, legs: legResults };
   };
 
   const runJupiterSell = async () => {
@@ -349,48 +553,115 @@ export function BucketDetailPage() {
 
     setBusy("Building sell plan…");
     setError(null);
+    setPartialResult(null);
     try {
       const plan = await postJupiterSellPlan(bucket.id, { solAmount: amount, slippageBps: 80 });
-      const swaps = plan.legs.filter(
-        (l): l is JupiterPlanLeg & { swapTransactionBase64: string } =>
-          l.kind === "swap" &&
-          typeof l.swapTransactionBase64 === "string" &&
-          l.swapTransactionBase64.length > 0
-      );
+      const swaps = plan.legs
+        .filter(
+          (l): l is JupiterPlanLeg & { swapTransactionBase64: string; legId: string } =>
+            l.kind === "swap" &&
+            typeof l.swapTransactionBase64 === "string" &&
+            l.swapTransactionBase64.length > 0 &&
+            typeof l.legId === "string" &&
+            l.legId.length > 0
+        )
+        .map((l) => ({
+          legId: l.legId,
+          symbol: l.symbol ?? null,
+          swapTransactionBase64: l.swapTransactionBase64
+        }));
       if (swaps.length === 0) {
         setError("No sell legs returned.");
         setBusy(null);
         return;
       }
-      const jupRpc = getJupiterSubmitRpcUrl();
-      const connection = new Connection(jupRpc, "confirmed");
 
-      // Optional fee transfer (sell flow currently doesn't have one but supports it).
       let feeTransferSignature: string | undefined;
       if (plan.feeTransfer && plan.feeTransfer.splits.length > 0) {
+        const jupRpc = getJupiterSubmitRpcUrl();
+        const connection = new Connection(jupRpc, "confirmed");
         setBusy(`Fee: ${describeFee(plan.feeTransfer)} — sign in wallet…`);
         feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
       }
 
-      // Single wallet popup signs ALL sell legs at once.
-      setBusy(`Sign ${swaps.length} sells in wallet…`);
-      const vtxs = swaps.map((leg) =>
-        VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
-      );
-      const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
-
-      // Send and confirm all in parallel via the configured RPC.
-      setBusy(`Submitting ${swaps.length} sells to Solana…`);
-      const sigs = await sendAndConfirmSignedB64Parallel(connection, signedB64);
-
-      setBusy("Recording withdrawal…");
-      await postJupiterSellComplete(bucket.id, {
-        solAmount: amount,
-        transactionSignatures: sigs,
+      const { attemptStatus, legs: legResults } = await runSellLegs({
+        attemptId: plan.attemptId,
+        legs: swaps,
         ...(feeTransferSignature ? { feeTransferSignature } : {})
       });
+
+      if (attemptStatus !== "COMPLETE") {
+        setPartialResult({
+          direction: "SELL",
+          attemptId: plan.attemptId,
+          successCount: legResults.filter((l) => l.status === "SUCCESS").length,
+          failedCount: legResults.filter((l) => l.status === "FAILED").length,
+          pendingCount: 0,
+          legs: legResults.map((r) => {
+            const order = swaps.find((l) => l.legId === r.legId);
+            return {
+              legId: r.legId,
+              symbol: order?.symbol ?? null,
+              status: r.status,
+              lastError: r.error ?? null
+            };
+          })
+        });
+      }
       await load();
       await loadPosition();
+      await loadResumableAttempts();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Resume the missing legs of a sell-direction attempt. */
+  const resumeSellAttempt = async (attemptId: string) => {
+    if (!bucket || !user) return;
+    setBusy("Re-quoting missing sell legs…");
+    setError(null);
+    setPartialResult(null);
+    try {
+      const resume = await postJupiterSellAttemptResume(bucket.id, attemptId);
+      if (resume.legs.length === 0) {
+        setError("Nothing to resume — all sell legs already settled.");
+        setBusy(null);
+        return;
+      }
+      const swaps = resume.legs.map((l) => ({
+        legId: l.legId,
+        symbol: l.symbol ?? null,
+        swapTransactionBase64: l.swapTransactionBase64
+      }));
+      const { attemptStatus, legs: legResults } = await runSellLegs({
+        attemptId,
+        legs: swaps
+      });
+      if (attemptStatus !== "COMPLETE") {
+        setPartialResult({
+          direction: "SELL",
+          attemptId,
+          successCount: legResults.filter((l) => l.status === "SUCCESS").length,
+          failedCount: legResults.filter((l) => l.status === "FAILED").length,
+          pendingCount: 0,
+          legs: legResults.map((r) => {
+            const order = swaps.find((l) => l.legId === r.legId);
+            return {
+              legId: r.legId,
+              symbol: order?.symbol ?? null,
+              status: r.status,
+              lastError: r.error ?? null
+            };
+          })
+        });
+      }
+      await load();
+      await loadPosition();
+      await loadResumableAttempts();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(hintIfRentError(msg) || errHint(msg) || msg);
@@ -466,6 +737,145 @@ export function BucketDetailPage() {
             </p>
 
             <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
+
+            {user && resumableAttempts.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-amber-300/60 bg-amber-50/60 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[14px] font-semibold text-amber-900">
+                    Pending basket{resumableAttempts.length === 1 ? "" : "s"} to finish
+                  </h3>
+                  <span className="text-[11px] font-mono text-amber-800/70">
+                    {resumableAttempts.length} attempt{resumableAttempts.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <p className="text-[12px] text-amber-900/80 mb-3 leading-snug">
+                  These attempts have one or more legs that didn't land (slippage, expiry, or you skipped them).
+                  Resuming re-quotes only the missing legs — successful legs already counted toward your position.
+                </p>
+                <ul className="space-y-3">
+                  {resumableAttempts.map((a) => {
+                    const successLegs = a.legs.filter((l) => l.status === "SUCCESS");
+                    const missingLegs = a.legs.filter(
+                      (l) => l.status === "PENDING" || l.status === "FAILED"
+                    );
+                    const isBuy = a.direction === "BUY";
+                    return (
+                      <li
+                        key={a.id}
+                        className="rounded-xl border border-amber-200 bg-white/80 px-3 py-2.5"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-[12px] font-semibold text-amber-900">
+                            {isBuy ? "Buy" : "Sell"} · intended {Number(a.intendedSol).toFixed(6)} SOL ·{" "}
+                            <span className="font-mono">{a.status}</span>
+                          </div>
+                          <div className="text-[11px] text-amber-800/70">
+                            {new Date(a.updatedAt).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="text-[11px] text-amber-900/80 mb-2 leading-snug">
+                          {successLegs.length} of {a.legs.length} legs settled.
+                          {missingLegs.length > 0 && (
+                            <>
+                              {" "}
+                              Missing: {missingLegs
+                                .map((l) => l.symbol ?? l.mint.slice(0, 4))
+                                .join(", ")}
+                              .
+                            </>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            onClick={() =>
+                              void (isBuy ? resumeBuyAttempt(a.id) : resumeSellAttempt(a.id))
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[12px] font-semibold disabled:opacity-50"
+                          >
+                            Resume {missingLegs.length} leg{missingLegs.length === 1 ? "" : "s"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            onClick={() => void abandonAttemptHandler(a.id)}
+                            className="px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-900 text-[12px] font-semibold disabled:opacity-50"
+                          >
+                            Don't resume
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {partialResult && (
+              <div className="mb-6 rounded-2xl border border-blue-300/70 bg-blue-50/70 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[14px] font-semibold text-blue-900">
+                    {partialResult.direction === "BUY" ? "Buy" : "Sell"} partially filled
+                  </h3>
+                  <span className="text-[11px] font-mono text-blue-800/70">
+                    {partialResult.successCount} ok · {partialResult.failedCount} failed
+                  </span>
+                </div>
+                <p className="text-[12px] text-blue-900/80 mb-3 leading-snug">
+                  Only the legs that landed on-chain were credited to your position. You can resume
+                  the missing legs now (re-signs only the missing ones), or skip — they'll stay in
+                  your "Pending baskets" so you can resume any time.
+                </p>
+                <ul className="space-y-1 mb-3">
+                  {partialResult.legs.map((l) => (
+                    <li key={l.legId} className="flex items-start justify-between text-[12px]">
+                      <span className="text-blue-900 font-medium">{l.symbol ?? l.legId.slice(0, 6)}</span>
+                      <span
+                        className={
+                          l.status === "SUCCESS"
+                            ? "text-emerald-700 font-mono"
+                            : "text-red-700 font-mono"
+                        }
+                      >
+                        {l.status}
+                        {l.lastError ? ` — ${l.lastError.slice(0, 60)}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() =>
+                      void (partialResult.direction === "BUY"
+                        ? resumeBuyAttempt(partialResult.attemptId)
+                        : resumeSellAttempt(partialResult.attemptId))
+                    }
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-[12px] font-semibold disabled:opacity-50"
+                  >
+                    Resume now
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => setPartialResult(null)}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-blue-200 text-blue-900 text-[12px] font-semibold disabled:opacity-50"
+                  >
+                    Resume later
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void abandonAttemptHandler(partialResult.attemptId)}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-700 text-[12px] font-semibold disabled:opacity-50"
+                  >
+                    Don't resume
+                  </button>
+                </div>
+              </div>
+            )}
 
             <h2 className="text-[15px] font-semibold text-[#374151] mb-3">Allocations</h2>
             <ul className="space-y-2 text-[14px] text-[#6b7280]">

@@ -203,20 +203,49 @@ export async function postJupiterInvestPlan(
   return out.data;
 }
 
+/** Per-leg result reported back to the server after each Jupiter execute. */
+export type BasketLegResult = {
+  legId: string;
+  status: "SUCCESS" | "FAILED";
+  signature?: string;
+  error?: string;
+};
+
+export type JupiterCompleteResponse = {
+  message: string;
+  attemptId: string;
+  attemptStatus: "PENDING" | "PARTIAL" | "COMPLETE" | "ABANDONED";
+  successLegIds: string[];
+  failedLegIds: string[];
+  pendingLegIds: string[];
+  feeTransferSignature: string | null;
+  feeTransferSkipped?: boolean;
+  breakdown?: {
+    intendedSol: number;
+    actuallyInvestedSol?: number;
+    actuallyWithdrawnSol?: number;
+    platformFeeBps?: number;
+    creatorFeeBps?: number;
+    platformFeeSol?: number;
+    creatorFeeSol?: number;
+    note?: string;
+  };
+};
+
 export async function postJupiterInvestComplete(
   bucketId: string,
   body: {
-    solAmount: number;
-    transactionSignatures: string[];
+    attemptId: string;
+    legs: BasketLegResult[];
     feeTransferSignature?: string;
   }
-): Promise<unknown> {
-  const res = await api.post<ApiResponse<unknown>>(
+): Promise<JupiterCompleteResponse> {
+  const res = await api.post<ApiResponse<JupiterCompleteResponse>>(
     `/buckets/${encodeURIComponent(bucketId)}/invest/jupiter-complete`,
     body
   );
   const out = res.data;
-  if (!out.success) throw new Error(out.error || "JUPITER_COMPLETE_FAILED");
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_COMPLETE_FAILED");
   return out.data;
 }
 
@@ -248,37 +277,161 @@ export async function postJupiterLegOrder(
   return out.data;
 }
 
+export type AttemptOrderLeg = {
+  legId: string;
+  outputMint: string;
+  symbol?: string | null;
+  inputLamports: number;
+  slippageBps: number;
+  swapTransactionBase64: string;
+  requestId: string;
+  expectedOutAmount: string;
+  minimumOutAmount: string;
+};
+
+/** Creates a `BasketAttempt` (BUY) + per-leg orders. Returns `attemptId` + per-leg `legId`s. */
 export async function postJupiterLegOrdersBatch(
   bucketId: string,
-  body: { legs: { outputMint: string; lamports: number }[]; slippageBps?: number }
+  body: {
+    legs: { outputMint: string; lamports: number }[];
+    slippageBps?: number;
+    intendedSol: number;
+  }
 ): Promise<{
+  attemptId: string;
   slippageBps: number;
-  legs: {
-    outputMint: string;
-    inputLamports: number;
-    slippageBps: number;
-    swapTransactionBase64: string;
-    requestId: string;
-    expectedOutAmount: string;
-    minimumOutAmount: string;
-  }[];
+  legs: AttemptOrderLeg[];
 }> {
   const res = await api.post<
     ApiResponse<{
+      attemptId: string;
       slippageBps: number;
-      legs: {
-        outputMint: string;
-        inputLamports: number;
-        slippageBps: number;
-        swapTransactionBase64: string;
-        requestId: string;
-        expectedOutAmount: string;
-        minimumOutAmount: string;
-      }[];
+      legs: AttemptOrderLeg[];
     }>
   >(`/buckets/${encodeURIComponent(bucketId)}/invest/jupiter-leg-orders-batch`, body);
   const out = res.data;
   if (!out.success || !out.data) throw new Error(out.error || "JUPITER_LEG_ORDERS_BATCH_FAILED");
+  return out.data;
+}
+
+/** Re-quote orders for the still-pending/failed legs of an existing BUY attempt. */
+export async function postJupiterAttemptResume(
+  bucketId: string,
+  attemptId: string,
+  body?: { slippageBps?: number }
+): Promise<{
+  attemptId: string;
+  slippageBps: number;
+  legs: AttemptOrderLeg[];
+  feeTransferAlreadyPaid?: boolean;
+}> {
+  const res = await api.post<
+    ApiResponse<{
+      attemptId: string;
+      slippageBps: number;
+      legs: AttemptOrderLeg[];
+      feeTransferAlreadyPaid?: boolean;
+    }>
+  >(
+    `/buckets/${encodeURIComponent(bucketId)}/invest/jupiter-attempts/${encodeURIComponent(
+      attemptId
+    )}/resume`,
+    body ?? {}
+  );
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_RESUME_FAILED");
+  return out.data;
+}
+
+/** Re-quote ExactOut for the still-pending/failed legs of an existing SELL attempt. */
+export async function postJupiterSellAttemptResume(
+  bucketId: string,
+  attemptId: string,
+  body?: { slippageBps?: number }
+): Promise<{
+  attemptId: string;
+  slippageBps: number;
+  legs: {
+    legId: string;
+    inputMint: string;
+    symbol?: string | null;
+    outputLamports: number;
+    estInputAmount: string;
+    swapTransactionBase64: string;
+  }[];
+}> {
+  const res = await api.post<
+    ApiResponse<{
+      attemptId: string;
+      slippageBps: number;
+      legs: {
+        legId: string;
+        inputMint: string;
+        symbol?: string | null;
+        outputLamports: number;
+        estInputAmount: string;
+        swapTransactionBase64: string;
+      }[];
+    }>
+  >(
+    `/buckets/${encodeURIComponent(bucketId)}/sell/jupiter-attempts/${encodeURIComponent(
+      attemptId
+    )}/resume`,
+    body ?? {}
+  );
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_SELL_RESUME_FAILED");
+  return out.data;
+}
+
+/** Mark a partial attempt as ABANDONED. Successful legs already settled remain settled. */
+export async function postAttemptAbandon(attemptId: string): Promise<unknown> {
+  const res = await api.post<ApiResponse<unknown>>(
+    `/attempts/${encodeURIComponent(attemptId)}/abandon`,
+    {}
+  );
+  const out = res.data;
+  if (!out.success) throw new Error(out.error || "ATTEMPT_ABANDON_FAILED");
+  return out.data;
+}
+
+export type BasketAttemptRow = {
+  id: string;
+  bucketId: string;
+  userId: string;
+  direction: "BUY" | "SELL";
+  intendedSol: string | number;
+  slippageBps: number;
+  status: "PENDING" | "PARTIAL" | "COMPLETE" | "ABANDONED";
+  feeTransferSignature?: string | null;
+  abandonedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  legs: {
+    id: string;
+    mint: string;
+    symbol?: string | null;
+    lamports: string | number;
+    legIndex: number;
+    status: "PENDING" | "SUCCESS" | "FAILED" | "SKIPPED";
+    transactionSignature?: string | null;
+    lastError?: string | null;
+  }[];
+  bucket: { id: string; name: string; type: "PUBLISHED" | "DRAFT"; version: number };
+};
+
+/** Pending/partial attempts for the current user — drives the "Resume" banner. */
+export async function fetchMyAttempts(params?: {
+  status?: "PENDING" | "PARTIAL" | "COMPLETE" | "ABANDONED";
+  bucketId?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: BasketAttemptRow[]; total: number; limit: number; offset: number }> {
+  const res = await api.get<
+    ApiResponse<{ data: BasketAttemptRow[]; total: number; limit: number; offset: number }>
+  >("/users/me/attempts", { params });
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "ATTEMPTS_FETCH_FAILED");
   return out.data;
 }
 
@@ -311,8 +464,8 @@ export async function postJupiterInvestExecute(
 export async function postJupiterSellPlan(
   bucketId: string,
   body: { solAmount: number; slippageBps?: number }
-): Promise<JupiterInvestPlan> {
-  const res = await api.post<ApiResponse<JupiterInvestPlan>>(
+): Promise<JupiterInvestPlan & { attemptId: string }> {
+  const res = await api.post<ApiResponse<JupiterInvestPlan & { attemptId: string }>>(
     `/buckets/${encodeURIComponent(bucketId)}/sell/jupiter-plan`,
     body
   );
@@ -324,17 +477,17 @@ export async function postJupiterSellPlan(
 export async function postJupiterSellComplete(
   bucketId: string,
   body: {
-    solAmount: number;
-    transactionSignatures: string[];
+    attemptId: string;
+    legs: BasketLegResult[];
     feeTransferSignature?: string;
   }
-): Promise<unknown> {
-  const res = await api.post<ApiResponse<unknown>>(
+): Promise<JupiterCompleteResponse> {
+  const res = await api.post<ApiResponse<JupiterCompleteResponse>>(
     `/buckets/${encodeURIComponent(bucketId)}/sell/jupiter-complete`,
     body
   );
   const out = res.data;
-  if (!out.success) throw new Error(out.error || "JUPITER_SELL_COMPLETE_FAILED");
+  if (!out.success || !out.data) throw new Error(out.error || "JUPITER_SELL_COMPLETE_FAILED");
   return out.data;
 }
 

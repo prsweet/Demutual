@@ -7,7 +7,7 @@ import { authRoutes } from "./routes/authRoutes";
 import { assetRoutes } from "./routes/assetRoutes";
 import { bucketRoutes } from "./routes/bucketRoutes";
 import { devnetRoutes } from "./routes/devnetRoutes";
-import { userRoutes } from "./routes/userRoutes";
+import { attemptRoutes, userRoutes } from "./routes/userRoutes";
 import { errors, response } from "./types";
 import { authPlugin } from "./middlewares/auth";
 
@@ -81,6 +81,7 @@ async function bootstrap() {
     .use(authPlugin)
     .use(authRoutes)
     .use(userRoutes)
+    .use(attemptRoutes)
     .use(assetRoutes)
     .use(bucketRoutes)
     .use(devnetRoutes)

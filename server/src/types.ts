@@ -63,7 +63,9 @@ export const jupiterLegOrderSchema = t.Object({
 
 export type jupiterLegOrderSchema = Static<typeof jupiterLegOrderSchema>;
 
-/** Build fresh Jupiter orders for many legs in one request — keeps Jupiter `/order` rate-limit pressure server-side. */
+/** Build fresh Jupiter orders for many legs in one request — keeps Jupiter `/order` rate-limit pressure server-side.
+ * Also CREATES a BasketAttempt + per-leg rows so that partial fills can be recorded and resumed.
+ */
 export const jupiterLegOrderBatchSchema = t.Object({
   legs: t.Array(
     t.Object({
@@ -72,20 +74,60 @@ export const jupiterLegOrderBatchSchema = t.Object({
     }),
     { minItems: 1, maxItems: 10 }
   ),
-  slippageBps: t.Optional(t.Number({ minimum: 1, maximum: 5000 }))
+  slippageBps: t.Optional(t.Number({ minimum: 1, maximum: 5000 })),
+  /** Total intended SOL for this attempt (gross). Used to credit the Deposit row sized to actual successes. */
+  intendedSol: t.Number({ exclusiveMinimum: 0 })
 });
 
 export type jupiterLegOrderBatchSchema = Static<typeof jupiterLegOrderBatchSchema>;
 
-/** After the investor signs & sends each swap tx, record the round-trip. */
+/** Per-leg result schema used by *attempt-complete and *attempt-resume-complete.
+ * `legId` MUST come back unchanged from `attempt-start` / `attempt-resume`.
+ */
+export const basketLegResultSchema = t.Object({
+  legId: t.String({ minLength: 1 }),
+  status: t.Union([t.Literal("SUCCESS"), t.Literal("FAILED")]),
+  signature: t.Optional(t.String({ minLength: 32, maxLength: 128 })),
+  error: t.Optional(t.String({ maxLength: 1024 }))
+});
+
+export type basketLegResultSchema = Static<typeof basketLegResultSchema>;
+
+/** Replaces the old `jupiterInvestCompleteSchema`: per-leg results scoped to a BasketAttempt. */
 export const jupiterInvestCompleteSchema = t.Object({
-  solAmount: t.Number({ exclusiveMinimum: 0 }),
-  transactionSignatures: t.Array(t.String({ minLength: 32, maxLength: 128 }), { minItems: 1 }),
-  /** Required iff the plan returned a `feeTransfer` and PLATFORM_FEE_WALLET_PUBKEY is configured. */
-  feeTransferSignature: t.Optional(t.String({ minLength: 32, maxLength: 128 }))
+  attemptId: t.String({ minLength: 1 }),
+  /** Required iff the plan returned a `feeTransfer` and PLATFORM_FEE_WALLET_PUBKEY is configured.
+   * On RESUME calls it is ignored (the attempt already has feeTransferSignature persisted).
+   */
+  feeTransferSignature: t.Optional(t.String({ minLength: 32, maxLength: 128 })),
+  legs: t.Array(basketLegResultSchema, { minItems: 1, maxItems: 20 })
 });
 
 export type jupiterInvestCompleteSchema = Static<typeof jupiterInvestCompleteSchema>;
+
+/** Resume the still-pending or failed legs of an existing PARTIAL/PENDING attempt. */
+export const jupiterAttemptResumeSchema = t.Object({
+  slippageBps: t.Optional(t.Number({ minimum: 1, maximum: 5000 }))
+});
+
+export type jupiterAttemptResumeSchema = Static<typeof jupiterAttemptResumeSchema>;
+
+/** Pagination + status filter for GET /users/me/attempts. */
+export const myAttemptsQuerySchema = t.Object({
+  status: t.Optional(
+    t.Union([
+      t.Literal("PENDING"),
+      t.Literal("PARTIAL"),
+      t.Literal("COMPLETE"),
+      t.Literal("ABANDONED")
+    ])
+  ),
+  bucketId: t.Optional(t.String({ minLength: 1 })),
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+  offset: t.Optional(t.Numeric({ minimum: 0 }))
+});
+
+export type myAttemptsQuerySchema = Static<typeof myAttemptsQuerySchema>;
 
 /** Sell side mirrors the buy: per-listing ExactOut quotes (asset → SOL) sized by withdrawal amount. */
 export const jupiterSellPlanSchema = t.Object({
@@ -95,10 +137,11 @@ export const jupiterSellPlanSchema = t.Object({
 
 export type jupiterSellPlanSchema = Static<typeof jupiterSellPlanSchema>;
 
+/** Sell-side attempt-complete: per-leg results referencing the BasketAttempt created on plan build. */
 export const jupiterSellCompleteSchema = t.Object({
-  solAmount: t.Number({ exclusiveMinimum: 0 }),
-  transactionSignatures: t.Array(t.String({ minLength: 32, maxLength: 128 }), { minItems: 1 }),
-  feeTransferSignature: t.Optional(t.String({ minLength: 32, maxLength: 128 }))
+  attemptId: t.String({ minLength: 1 }),
+  feeTransferSignature: t.Optional(t.String({ minLength: 32, maxLength: 128 })),
+  legs: t.Array(basketLegResultSchema, { minItems: 1, maxItems: 20 })
 });
 
 export type jupiterSellCompleteSchema = Static<typeof jupiterSellCompleteSchema>;
@@ -207,5 +250,9 @@ export const errors = {
   feeTransferVerify400: "FEE_TRANSFER_VERIFICATION_FAILED",
   creatorWalletMissing400: "CREATOR_WALLET_MISSING",
   withdrawInsufficient400: "WITHDRAW_EXCEEDS_POSITION",
-  withdrawBucketNotPublished400: "WITHDRAW_BUCKET_NOT_PUBLISHED"
+  withdrawBucketNotPublished400: "WITHDRAW_BUCKET_NOT_PUBLISHED",
+  attemptNotFound404: "ATTEMPT_NOT_FOUND",
+  attemptNotResumable400: "ATTEMPT_NOT_RESUMABLE",
+  attemptNoLegsToResume400: "ATTEMPT_NO_LEGS_TO_RESUME",
+  attemptLegMismatch400: "ATTEMPT_LEG_MISMATCH"
 }

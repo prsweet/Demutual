@@ -53,6 +53,17 @@ export type Listing = Prisma.ListingModel
  */
 export type Bucket = Prisma.BucketModel
 /**
+ * Model BasketAttempt
+ * A basket buy or sell intent. Tracks per-leg outcome so partial fills don't lie about TVL,
+ * and lets the user resume only the missing legs later.
+ */
+export type BasketAttempt = Prisma.BasketAttemptModel
+/**
+ * Model BasketAttemptLeg
+ * 
+ */
+export type BasketAttemptLeg = Prisma.BasketAttemptLegModel
+/**
  * Model Nonce
  * 
  */

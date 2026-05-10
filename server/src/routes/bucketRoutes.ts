@@ -7,6 +7,7 @@ import {
   addBucketAssetsSchema,
   createBucketSchema,
   investInBucketSchema,
+  jupiterAttemptResumeSchema,
   jupiterInvestCompleteSchema,
   jupiterExecuteSchema,
   jupiterInvestPlanSchema,
@@ -18,6 +19,7 @@ import {
   withdrawBucketSchema,
   idParamSchema
 } from "../types";
+import { t } from "elysia";
 
 /** Flat routes under `/buckets` — nested `group("/")` was omitting POST /buckets and creator paths in Elysia. */
 const creatorOnly = [authMiddlewares.requireAuth, authMiddlewares.requireBucketCreator];
@@ -65,6 +67,18 @@ export const bucketRoutes = new Elysia({ prefix: "/buckets" })
     body: jupiterInvestCompleteSchema,
     params: idParamSchema
   })
+  .post(
+    "/:id/invest/jupiter-attempts/:attemptId/resume",
+    jupiterInvestControllers.resumeJupiterAttempt,
+    {
+      beforeHandle: authMiddlewares.requireAuth,
+      body: jupiterAttemptResumeSchema,
+      params: t.Object({
+        id: t.String({ minLength: 1 }),
+        attemptId: t.String({ minLength: 1 })
+      })
+    }
+  )
   .post("/:id/sell/jupiter-plan", jupiterSellControllers.buildJupiterSellPlan, {
     beforeHandle: authMiddlewares.requireAuth,
     body: jupiterSellPlanSchema,
@@ -75,6 +89,18 @@ export const bucketRoutes = new Elysia({ prefix: "/buckets" })
     body: jupiterSellCompleteSchema,
     params: idParamSchema
   })
+  .post(
+    "/:id/sell/jupiter-attempts/:attemptId/resume",
+    jupiterSellControllers.resumeJupiterSellAttempt,
+    {
+      beforeHandle: authMiddlewares.requireAuth,
+      body: jupiterAttemptResumeSchema,
+      params: t.Object({
+        id: t.String({ minLength: 1 }),
+        attemptId: t.String({ minLength: 1 })
+      })
+    }
+  )
   .post("/:id/withdraw", bucketControllers.withdrawFromBucket, {
     beforeHandle: authMiddlewares.requireAuth,
     body: withdrawBucketSchema,

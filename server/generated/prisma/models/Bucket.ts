@@ -49,6 +49,7 @@ export type BucketMinAggregateOutputType = {
   apy: runtime.Decimal | null
   estimated_apy: runtime.Decimal | null
   type: $Enums.BucketType | null
+  researchDoc: string | null
   createdAt: Date | null
 }
 
@@ -61,6 +62,7 @@ export type BucketMaxAggregateOutputType = {
   apy: runtime.Decimal | null
   estimated_apy: runtime.Decimal | null
   type: $Enums.BucketType | null
+  researchDoc: string | null
   createdAt: Date | null
 }
 
@@ -74,6 +76,7 @@ export type BucketCountAggregateOutputType = {
   estimated_apy: number
   type: number
   metaData: number
+  researchDoc: number
   createdAt: number
   _all: number
 }
@@ -102,6 +105,7 @@ export type BucketMinAggregateInputType = {
   apy?: true
   estimated_apy?: true
   type?: true
+  researchDoc?: true
   createdAt?: true
 }
 
@@ -114,6 +118,7 @@ export type BucketMaxAggregateInputType = {
   apy?: true
   estimated_apy?: true
   type?: true
+  researchDoc?: true
   createdAt?: true
 }
 
@@ -127,6 +132,7 @@ export type BucketCountAggregateInputType = {
   estimated_apy?: true
   type?: true
   metaData?: true
+  researchDoc?: true
   createdAt?: true
   _all?: true
 }
@@ -227,6 +233,7 @@ export type BucketGroupByOutputType = {
   estimated_apy: runtime.Decimal
   type: $Enums.BucketType
   metaData: runtime.JsonValue | null
+  researchDoc: string | null
   createdAt: Date
   _count: BucketCountAggregateOutputType | null
   _avg: BucketAvgAggregateOutputType | null
@@ -263,11 +270,13 @@ export type BucketWhereInput = {
   estimated_apy?: Prisma.DecimalFilter<"Bucket"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFilter<"Bucket"> | $Enums.BucketType
   metaData?: Prisma.JsonNullableFilter<"Bucket">
+  researchDoc?: Prisma.StringNullableFilter<"Bucket"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Bucket"> | Date | string
   creator?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   listing?: Prisma.ListingListRelationFilter
   deposits?: Prisma.DepositListRelationFilter
   withdrawals?: Prisma.WithdrawalListRelationFilter
+  basketAttempts?: Prisma.BasketAttemptListRelationFilter
 }
 
 export type BucketOrderByWithRelationInput = {
@@ -280,11 +289,13 @@ export type BucketOrderByWithRelationInput = {
   estimated_apy?: Prisma.SortOrder
   type?: Prisma.SortOrder
   metaData?: Prisma.SortOrderInput | Prisma.SortOrder
+  researchDoc?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   creator?: Prisma.UserOrderByWithRelationInput
   listing?: Prisma.ListingOrderByRelationAggregateInput
   deposits?: Prisma.DepositOrderByRelationAggregateInput
   withdrawals?: Prisma.WithdrawalOrderByRelationAggregateInput
+  basketAttempts?: Prisma.BasketAttemptOrderByRelationAggregateInput
 }
 
 export type BucketWhereUniqueInput = Prisma.AtLeast<{
@@ -301,11 +312,13 @@ export type BucketWhereUniqueInput = Prisma.AtLeast<{
   estimated_apy?: Prisma.DecimalFilter<"Bucket"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFilter<"Bucket"> | $Enums.BucketType
   metaData?: Prisma.JsonNullableFilter<"Bucket">
+  researchDoc?: Prisma.StringNullableFilter<"Bucket"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Bucket"> | Date | string
   creator?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   listing?: Prisma.ListingListRelationFilter
   deposits?: Prisma.DepositListRelationFilter
   withdrawals?: Prisma.WithdrawalListRelationFilter
+  basketAttempts?: Prisma.BasketAttemptListRelationFilter
 }, "id" | "creatorId_name_version">
 
 export type BucketOrderByWithAggregationInput = {
@@ -318,6 +331,7 @@ export type BucketOrderByWithAggregationInput = {
   estimated_apy?: Prisma.SortOrder
   type?: Prisma.SortOrder
   metaData?: Prisma.SortOrderInput | Prisma.SortOrder
+  researchDoc?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.BucketCountOrderByAggregateInput
   _avg?: Prisma.BucketAvgOrderByAggregateInput
@@ -339,6 +353,7 @@ export type BucketScalarWhereWithAggregatesInput = {
   estimated_apy?: Prisma.DecimalWithAggregatesFilter<"Bucket"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeWithAggregatesFilter<"Bucket"> | $Enums.BucketType
   metaData?: Prisma.JsonNullableWithAggregatesFilter<"Bucket">
+  researchDoc?: Prisma.StringNullableWithAggregatesFilter<"Bucket"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Bucket"> | Date | string
 }
 
@@ -351,11 +366,13 @@ export type BucketCreateInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   creator: Prisma.UserCreateNestedOneWithoutBucketsInput
   listing?: Prisma.ListingCreateNestedManyWithoutBucketInput
   deposits?: Prisma.DepositCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutBucketInput
 }
 
 export type BucketUncheckedCreateInput = {
@@ -368,10 +385,12 @@ export type BucketUncheckedCreateInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   listing?: Prisma.ListingUncheckedCreateNestedManyWithoutBucketInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutBucketInput
 }
 
 export type BucketUpdateInput = {
@@ -383,11 +402,13 @@ export type BucketUpdateInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   creator?: Prisma.UserUpdateOneRequiredWithoutBucketsNestedInput
   listing?: Prisma.ListingUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketUncheckedUpdateInput = {
@@ -400,10 +421,12 @@ export type BucketUncheckedUpdateInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.ListingUncheckedUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketCreateManyInput = {
@@ -416,6 +439,7 @@ export type BucketCreateManyInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
 }
 
@@ -428,6 +452,7 @@ export type BucketUpdateManyMutationInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -441,6 +466,7 @@ export type BucketUncheckedUpdateManyInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -475,6 +501,7 @@ export type BucketCountOrderByAggregateInput = {
   estimated_apy?: Prisma.SortOrder
   type?: Prisma.SortOrder
   metaData?: Prisma.SortOrder
+  researchDoc?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -494,6 +521,7 @@ export type BucketMaxOrderByAggregateInput = {
   apy?: Prisma.SortOrder
   estimated_apy?: Prisma.SortOrder
   type?: Prisma.SortOrder
+  researchDoc?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -506,6 +534,7 @@ export type BucketMinOrderByAggregateInput = {
   apy?: Prisma.SortOrder
   estimated_apy?: Prisma.SortOrder
   type?: Prisma.SortOrder
+  researchDoc?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -604,6 +633,20 @@ export type EnumBucketTypeFieldUpdateOperationsInput = {
   set?: $Enums.BucketType
 }
 
+export type BucketCreateNestedOneWithoutBasketAttemptsInput = {
+  create?: Prisma.XOR<Prisma.BucketCreateWithoutBasketAttemptsInput, Prisma.BucketUncheckedCreateWithoutBasketAttemptsInput>
+  connectOrCreate?: Prisma.BucketCreateOrConnectWithoutBasketAttemptsInput
+  connect?: Prisma.BucketWhereUniqueInput
+}
+
+export type BucketUpdateOneRequiredWithoutBasketAttemptsNestedInput = {
+  create?: Prisma.XOR<Prisma.BucketCreateWithoutBasketAttemptsInput, Prisma.BucketUncheckedCreateWithoutBasketAttemptsInput>
+  connectOrCreate?: Prisma.BucketCreateOrConnectWithoutBasketAttemptsInput
+  upsert?: Prisma.BucketUpsertWithoutBasketAttemptsInput
+  connect?: Prisma.BucketWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.BucketUpdateToOneWithWhereWithoutBasketAttemptsInput, Prisma.BucketUpdateWithoutBasketAttemptsInput>, Prisma.BucketUncheckedUpdateWithoutBasketAttemptsInput>
+}
+
 export type BucketCreateWithoutCreatorInput = {
   id?: string
   name: string
@@ -613,10 +656,12 @@ export type BucketCreateWithoutCreatorInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   listing?: Prisma.ListingCreateNestedManyWithoutBucketInput
   deposits?: Prisma.DepositCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutBucketInput
 }
 
 export type BucketUncheckedCreateWithoutCreatorInput = {
@@ -628,10 +673,12 @@ export type BucketUncheckedCreateWithoutCreatorInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   listing?: Prisma.ListingUncheckedCreateNestedManyWithoutBucketInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutBucketInput
 }
 
 export type BucketCreateOrConnectWithoutCreatorInput = {
@@ -673,6 +720,7 @@ export type BucketScalarWhereInput = {
   estimated_apy?: Prisma.DecimalFilter<"Bucket"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFilter<"Bucket"> | $Enums.BucketType
   metaData?: Prisma.JsonNullableFilter<"Bucket">
+  researchDoc?: Prisma.StringNullableFilter<"Bucket"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Bucket"> | Date | string
 }
 
@@ -685,10 +733,12 @@ export type BucketCreateWithoutDepositsInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   creator: Prisma.UserCreateNestedOneWithoutBucketsInput
   listing?: Prisma.ListingCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutBucketInput
 }
 
 export type BucketUncheckedCreateWithoutDepositsInput = {
@@ -701,9 +751,11 @@ export type BucketUncheckedCreateWithoutDepositsInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   listing?: Prisma.ListingUncheckedCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutBucketInput
 }
 
 export type BucketCreateOrConnectWithoutDepositsInput = {
@@ -731,10 +783,12 @@ export type BucketUpdateWithoutDepositsInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   creator?: Prisma.UserUpdateOneRequiredWithoutBucketsNestedInput
   listing?: Prisma.ListingUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketUncheckedUpdateWithoutDepositsInput = {
@@ -747,9 +801,11 @@ export type BucketUncheckedUpdateWithoutDepositsInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.ListingUncheckedUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketCreateWithoutWithdrawalsInput = {
@@ -761,10 +817,12 @@ export type BucketCreateWithoutWithdrawalsInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   creator: Prisma.UserCreateNestedOneWithoutBucketsInput
   listing?: Prisma.ListingCreateNestedManyWithoutBucketInput
   deposits?: Prisma.DepositCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutBucketInput
 }
 
 export type BucketUncheckedCreateWithoutWithdrawalsInput = {
@@ -777,9 +835,11 @@ export type BucketUncheckedCreateWithoutWithdrawalsInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   listing?: Prisma.ListingUncheckedCreateNestedManyWithoutBucketInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutBucketInput
 }
 
 export type BucketCreateOrConnectWithoutWithdrawalsInput = {
@@ -807,10 +867,12 @@ export type BucketUpdateWithoutWithdrawalsInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   creator?: Prisma.UserUpdateOneRequiredWithoutBucketsNestedInput
   listing?: Prisma.ListingUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketUncheckedUpdateWithoutWithdrawalsInput = {
@@ -823,9 +885,11 @@ export type BucketUncheckedUpdateWithoutWithdrawalsInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.ListingUncheckedUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketCreateWithoutListingInput = {
@@ -837,10 +901,12 @@ export type BucketCreateWithoutListingInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   creator: Prisma.UserCreateNestedOneWithoutBucketsInput
   deposits?: Prisma.DepositCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutBucketInput
 }
 
 export type BucketUncheckedCreateWithoutListingInput = {
@@ -853,9 +919,11 @@ export type BucketUncheckedCreateWithoutListingInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutBucketInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutBucketInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutBucketInput
 }
 
 export type BucketCreateOrConnectWithoutListingInput = {
@@ -883,10 +951,12 @@ export type BucketUpdateWithoutListingInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   creator?: Prisma.UserUpdateOneRequiredWithoutBucketsNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketUncheckedUpdateWithoutListingInput = {
@@ -899,7 +969,93 @@ export type BucketUncheckedUpdateWithoutListingInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deposits?: Prisma.DepositUncheckedUpdateManyWithoutBucketNestedInput
+  withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutBucketNestedInput
+}
+
+export type BucketCreateWithoutBasketAttemptsInput = {
+  id?: string
+  name: string
+  version?: number
+  tvl: runtime.Decimal | runtime.DecimalJsLike | number | string
+  apy?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
+  type?: $Enums.BucketType
+  metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
+  createdAt?: Date | string
+  creator: Prisma.UserCreateNestedOneWithoutBucketsInput
+  listing?: Prisma.ListingCreateNestedManyWithoutBucketInput
+  deposits?: Prisma.DepositCreateNestedManyWithoutBucketInput
+  withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutBucketInput
+}
+
+export type BucketUncheckedCreateWithoutBasketAttemptsInput = {
+  id?: string
+  name: string
+  version?: number
+  creatorId: string
+  tvl: runtime.Decimal | runtime.DecimalJsLike | number | string
+  apy?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
+  type?: $Enums.BucketType
+  metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
+  createdAt?: Date | string
+  listing?: Prisma.ListingUncheckedCreateNestedManyWithoutBucketInput
+  deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutBucketInput
+  withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutBucketInput
+}
+
+export type BucketCreateOrConnectWithoutBasketAttemptsInput = {
+  where: Prisma.BucketWhereUniqueInput
+  create: Prisma.XOR<Prisma.BucketCreateWithoutBasketAttemptsInput, Prisma.BucketUncheckedCreateWithoutBasketAttemptsInput>
+}
+
+export type BucketUpsertWithoutBasketAttemptsInput = {
+  update: Prisma.XOR<Prisma.BucketUpdateWithoutBasketAttemptsInput, Prisma.BucketUncheckedUpdateWithoutBasketAttemptsInput>
+  create: Prisma.XOR<Prisma.BucketCreateWithoutBasketAttemptsInput, Prisma.BucketUncheckedCreateWithoutBasketAttemptsInput>
+  where?: Prisma.BucketWhereInput
+}
+
+export type BucketUpdateToOneWithWhereWithoutBasketAttemptsInput = {
+  where?: Prisma.BucketWhereInput
+  data: Prisma.XOR<Prisma.BucketUpdateWithoutBasketAttemptsInput, Prisma.BucketUncheckedUpdateWithoutBasketAttemptsInput>
+}
+
+export type BucketUpdateWithoutBasketAttemptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  tvl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  apy?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
+  metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  creator?: Prisma.UserUpdateOneRequiredWithoutBucketsNestedInput
+  listing?: Prisma.ListingUpdateManyWithoutBucketNestedInput
+  deposits?: Prisma.DepositUpdateManyWithoutBucketNestedInput
+  withdrawals?: Prisma.WithdrawalUpdateManyWithoutBucketNestedInput
+}
+
+export type BucketUncheckedUpdateWithoutBasketAttemptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  creatorId?: Prisma.StringFieldUpdateOperationsInput | string
+  tvl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  apy?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
+  metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  listing?: Prisma.ListingUncheckedUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutBucketNestedInput
 }
@@ -913,6 +1069,7 @@ export type BucketCreateManyCreatorInput = {
   estimated_apy: runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: string | null
   createdAt?: Date | string
 }
 
@@ -925,10 +1082,12 @@ export type BucketUpdateWithoutCreatorInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.ListingUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketUncheckedUpdateWithoutCreatorInput = {
@@ -940,10 +1099,12 @@ export type BucketUncheckedUpdateWithoutCreatorInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.ListingUncheckedUpdateManyWithoutBucketNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutBucketNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutBucketNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutBucketNestedInput
 }
 
 export type BucketUncheckedUpdateManyWithoutCreatorInput = {
@@ -955,6 +1116,7 @@ export type BucketUncheckedUpdateManyWithoutCreatorInput = {
   estimated_apy?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   type?: Prisma.EnumBucketTypeFieldUpdateOperationsInput | $Enums.BucketType
   metaData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  researchDoc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -967,12 +1129,14 @@ export type BucketCountOutputType = {
   listing: number
   deposits: number
   withdrawals: number
+  basketAttempts: number
 }
 
 export type BucketCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   listing?: boolean | BucketCountOutputTypeCountListingArgs
   deposits?: boolean | BucketCountOutputTypeCountDepositsArgs
   withdrawals?: boolean | BucketCountOutputTypeCountWithdrawalsArgs
+  basketAttempts?: boolean | BucketCountOutputTypeCountBasketAttemptsArgs
 }
 
 /**
@@ -1006,6 +1170,13 @@ export type BucketCountOutputTypeCountWithdrawalsArgs<ExtArgs extends runtime.Ty
   where?: Prisma.WithdrawalWhereInput
 }
 
+/**
+ * BucketCountOutputType without action
+ */
+export type BucketCountOutputTypeCountBasketAttemptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BasketAttemptWhereInput
+}
+
 
 export type BucketSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1017,11 +1188,13 @@ export type BucketSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   estimated_apy?: boolean
   type?: boolean
   metaData?: boolean
+  researchDoc?: boolean
   createdAt?: boolean
   creator?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   listing?: boolean | Prisma.Bucket$listingArgs<ExtArgs>
   deposits?: boolean | Prisma.Bucket$depositsArgs<ExtArgs>
   withdrawals?: boolean | Prisma.Bucket$withdrawalsArgs<ExtArgs>
+  basketAttempts?: boolean | Prisma.Bucket$basketAttemptsArgs<ExtArgs>
   _count?: boolean | Prisma.BucketCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bucket"]>
 
@@ -1035,6 +1208,7 @@ export type BucketSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   estimated_apy?: boolean
   type?: boolean
   metaData?: boolean
+  researchDoc?: boolean
   createdAt?: boolean
   creator?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bucket"]>
@@ -1049,6 +1223,7 @@ export type BucketSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   estimated_apy?: boolean
   type?: boolean
   metaData?: boolean
+  researchDoc?: boolean
   createdAt?: boolean
   creator?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["bucket"]>
@@ -1063,15 +1238,17 @@ export type BucketSelectScalar = {
   estimated_apy?: boolean
   type?: boolean
   metaData?: boolean
+  researchDoc?: boolean
   createdAt?: boolean
 }
 
-export type BucketOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "version" | "creatorId" | "tvl" | "apy" | "estimated_apy" | "type" | "metaData" | "createdAt", ExtArgs["result"]["bucket"]>
+export type BucketOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "version" | "creatorId" | "tvl" | "apy" | "estimated_apy" | "type" | "metaData" | "researchDoc" | "createdAt", ExtArgs["result"]["bucket"]>
 export type BucketInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   creator?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   listing?: boolean | Prisma.Bucket$listingArgs<ExtArgs>
   deposits?: boolean | Prisma.Bucket$depositsArgs<ExtArgs>
   withdrawals?: boolean | Prisma.Bucket$withdrawalsArgs<ExtArgs>
+  basketAttempts?: boolean | Prisma.Bucket$basketAttemptsArgs<ExtArgs>
   _count?: boolean | Prisma.BucketCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type BucketIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1088,6 +1265,7 @@ export type $BucketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     listing: Prisma.$ListingPayload<ExtArgs>[]
     deposits: Prisma.$DepositPayload<ExtArgs>[]
     withdrawals: Prisma.$WithdrawalPayload<ExtArgs>[]
+    basketAttempts: Prisma.$BasketAttemptPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1099,6 +1277,7 @@ export type $BucketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     estimated_apy: runtime.Decimal
     type: $Enums.BucketType
     metaData: runtime.JsonValue | null
+    researchDoc: string | null
     createdAt: Date
   }, ExtArgs["result"]["bucket"]>
   composites: {}
@@ -1498,6 +1677,7 @@ export interface Prisma__BucketClient<T, Null = never, ExtArgs extends runtime.T
   listing<T extends Prisma.Bucket$listingArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bucket$listingArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ListingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   deposits<T extends Prisma.Bucket$depositsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bucket$depositsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DepositPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   withdrawals<T extends Prisma.Bucket$withdrawalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bucket$withdrawalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WithdrawalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  basketAttempts<T extends Prisma.Bucket$basketAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Bucket$basketAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BasketAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1536,6 +1716,7 @@ export interface BucketFieldRefs {
   readonly estimated_apy: Prisma.FieldRef<"Bucket", 'Decimal'>
   readonly type: Prisma.FieldRef<"Bucket", 'BucketType'>
   readonly metaData: Prisma.FieldRef<"Bucket", 'Json'>
+  readonly researchDoc: Prisma.FieldRef<"Bucket", 'String'>
   readonly createdAt: Prisma.FieldRef<"Bucket", 'DateTime'>
 }
     
@@ -2007,6 +2188,30 @@ export type Bucket$withdrawalsArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.WithdrawalScalarFieldEnum | Prisma.WithdrawalScalarFieldEnum[]
+}
+
+/**
+ * Bucket.basketAttempts
+ */
+export type Bucket$basketAttemptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BasketAttempt
+   */
+  select?: Prisma.BasketAttemptSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BasketAttempt
+   */
+  omit?: Prisma.BasketAttemptOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BasketAttemptInclude<ExtArgs> | null
+  where?: Prisma.BasketAttemptWhereInput
+  orderBy?: Prisma.BasketAttemptOrderByWithRelationInput | Prisma.BasketAttemptOrderByWithRelationInput[]
+  cursor?: Prisma.BasketAttemptWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BasketAttemptScalarFieldEnum | Prisma.BasketAttemptScalarFieldEnum[]
 }
 
 /**

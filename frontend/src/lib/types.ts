@@ -79,6 +79,7 @@ export type RootApiPayload = {
 
 export type JupiterPlanLeg = {
   kind: string;
+  legId?: string;
   symbol?: string;
   swapTransactionBase64?: string;
   requestId?: string;

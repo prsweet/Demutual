@@ -15,3 +15,31 @@ export const BucketType = {
 } as const
 
 export type BucketType = (typeof BucketType)[keyof typeof BucketType]
+
+
+export const BasketDirection = {
+  BUY: 'BUY',
+  SELL: 'SELL'
+} as const
+
+export type BasketDirection = (typeof BasketDirection)[keyof typeof BasketDirection]
+
+
+export const BasketAttemptStatus = {
+  PENDING: 'PENDING',
+  PARTIAL: 'PARTIAL',
+  COMPLETE: 'COMPLETE',
+  ABANDONED: 'ABANDONED'
+} as const
+
+export type BasketAttemptStatus = (typeof BasketAttemptStatus)[keyof typeof BasketAttemptStatus]
+
+
+export const BasketLegStatus = {
+  PENDING: 'PENDING',
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED'
+} as const
+
+export type BasketLegStatus = (typeof BasketLegStatus)[keyof typeof BasketLegStatus]
