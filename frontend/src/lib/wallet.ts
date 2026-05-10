@@ -1,0 +1,26 @@
+/** @deprecated Import from `./solanaWallet` — kept for shorter import paths */
+export {
+  shortenAddress,
+  assertValidSolanaAddress,
+  getPhantom,
+  connectPhantomWallet,
+  signUtf8MessageWithPhantom,
+  disconnectPhantom,
+  type WalletKind,
+  type InjectedSolanaWallet,
+  getBackpackProvider,
+  connectBackpackWallet,
+  setWalletKind,
+  getWalletKind,
+  clearWalletKind,
+  getConnectedProvider,
+  getConnectedAddress,
+  disconnectActiveWallet,
+  signLoginMessage,
+  b64ToUint8Array,
+  walletSendSolTransfer,
+  signAndSendVersioned,
+  signFeeTransfer,
+  solToLamports,
+  describeFee
+} from "./solanaWallet";
