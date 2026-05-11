@@ -58,6 +58,7 @@ import {
 import { displayTokenName, displayTokenSymbol } from "../lib/tokenLabels";
 import { SOL_MINT, usePrices } from "../lib/usePrices";
 import { useTokenInfo } from "../lib/useTokenInfo";
+import { parseWalletError, WalletDeniedError } from "../lib/walletError";
 import {
   AlertCircle,
   ArrowLeft,
@@ -394,7 +395,23 @@ export function BucketDetailPage() {
     const vtxs = params.legs.map((b) =>
       VersionedTransaction.deserialize(b64ToUint8Array(b.swapTransactionBase64))
     );
-    const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+    let signedB64: string[];
+    try {
+      signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+    } catch (e) {
+      const parsed = parseWalletError(e);
+      if (parsed.isUserDenial) {
+        // No on-chain attempt was made — abandon the empty BasketAttempt so it doesn't
+        // clutter the "Pending baskets" list with something that never started.
+        try {
+          await postAttemptAbandon(params.attemptId);
+        } catch {
+          // Non-fatal: abandon failed but the error message is still what the user needs.
+        }
+        throw new WalletDeniedError(parsed.message);
+      }
+      throw e;
+    }
 
     setBusy(`Executing ${params.legs.length} swap${params.legs.length === 1 ? "" : "s"} via Jupiter…`);
     const execResults = await Promise.allSettled(
@@ -501,7 +518,13 @@ export function BucketDetailPage() {
       let feeTransferSignature: string | undefined;
       if (hasFee && plan.feeTransfer) {
         setBusy(`Step ${stepN}/${totalSteps} · sign fee (${describeFee(plan.feeTransfer)}) in wallet…`);
-        feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
+        try {
+          feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
+        } catch (e) {
+          const parsed = parseWalletError(e);
+          if (parsed.isUserDenial) throw new WalletDeniedError(parsed.message);
+          throw e;
+        }
         stepN += 1;
       }
       const slip = plan.slippageBps ?? slippageBps;
@@ -543,8 +566,16 @@ export function BucketDetailPage() {
       await loadPosition();
       await loadResumableAttempts();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(hintIfRentError(msg) || errHint(msg) || msg);
+      if (e instanceof WalletDeniedError) {
+        setError("You cancelled the buy in your wallet — nothing was charged.");
+        setPartialResult(null);
+        setJupiterBuyPlan(null);
+        setPlanDialog(null);
+        await loadResumableAttempts();
+      } else {
+        const parsed = parseWalletError(e);
+        setError(hintIfRentError(parsed.message) || errHint(parsed.message) || parsed.message);
+      }
     } finally {
       setBusy(null);
     }
@@ -588,8 +619,14 @@ export function BucketDetailPage() {
       await loadPosition();
       await loadResumableAttempts();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(hintIfRentError(msg) || errHint(msg) || msg);
+      if (e instanceof WalletDeniedError) {
+        setError("You cancelled the resume in your wallet — the pending basket is unchanged.");
+        setPartialResult(null);
+        await loadResumableAttempts();
+      } else {
+        const parsed = parseWalletError(e);
+        setError(hintIfRentError(parsed.message) || errHint(parsed.message) || parsed.message);
+      }
     } finally {
       setBusy(null);
     }
@@ -625,7 +662,21 @@ export function BucketDetailPage() {
     const vtxs = params.legs.map((leg) =>
       VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
     );
-    const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+    let signedB64: string[];
+    try {
+      signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
+    } catch (e) {
+      const parsed = parseWalletError(e);
+      if (parsed.isUserDenial) {
+        try {
+          await postAttemptAbandon(params.attemptId);
+        } catch {
+          // Non-fatal — message takes precedence.
+        }
+        throw new WalletDeniedError(parsed.message);
+      }
+      throw e;
+    }
 
     setBusy(`Executing ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} via Jupiter…`);
     const execResults = await Promise.allSettled(
@@ -791,7 +842,13 @@ export function BucketDetailPage() {
         const jupRpc = getJupiterSubmitRpcUrl();
         const connection = new Connection(jupRpc, "confirmed");
         setBusy(`Step 1/2 · sign fee (${describeFee(plan.feeTransfer)}) in wallet…`);
-        feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
+        try {
+          feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
+        } catch (e) {
+          const parsed = parseWalletError(e);
+          if (parsed.isUserDenial) throw new WalletDeniedError(parsed.message);
+          throw e;
+        }
       }
 
       const { attemptStatus, legs: legResults } = await runSellLegs({
@@ -824,8 +881,21 @@ export function BucketDetailPage() {
       await loadPosition();
       await loadResumableAttempts();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(hintIfMissingBasketAssets(msg) || hintIfRentError(msg) || errHint(msg) || msg);
+      if (e instanceof WalletDeniedError) {
+        setError("You cancelled the sell in your wallet — nothing was sold.");
+        setPartialResult(null);
+        setJupiterSellPlan(null);
+        setPlanDialog(null);
+        await loadResumableAttempts();
+      } else {
+        const parsed = parseWalletError(e);
+        setError(
+          hintIfMissingBasketAssets(parsed.message) ||
+            hintIfRentError(parsed.message) ||
+            errHint(parsed.message) ||
+            parsed.message
+        );
+      }
     } finally {
       setBusy(null);
     }
@@ -872,8 +942,19 @@ export function BucketDetailPage() {
       await loadPosition();
       await loadResumableAttempts();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(hintIfMissingBasketAssets(msg) || hintIfRentError(msg) || errHint(msg) || msg);
+      if (e instanceof WalletDeniedError) {
+        setError("You cancelled the sell resume in your wallet — the pending basket is unchanged.");
+        setPartialResult(null);
+        await loadResumableAttempts();
+      } else {
+        const parsed = parseWalletError(e);
+        setError(
+          hintIfMissingBasketAssets(parsed.message) ||
+            hintIfRentError(parsed.message) ||
+            errHint(parsed.message) ||
+            parsed.message
+        );
+      }
     } finally {
       setBusy(null);
     }

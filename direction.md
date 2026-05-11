@@ -95,3 +95,26 @@ We're building:
   crypto), but assumes **creators** are competent enough to operate a wallet
   — the same way a fund manager is expected to have a bank account before
   running a fund.
+
+  ## Position accuracy — wallet-balance reconciliation (follow-up)
+
+  Current behaviour: `availableToWithdraw` is inferred from
+  `totalDeposited − totalWithdrawn` on the Deposit / Withdrawal ledger. This
+  is a *claim* about position, not a fact — it can drift from on-chain
+  reality whenever a user moves or sells one of the basket tokens outside
+  Demutual. We hit this during the Frontier build: the ledger said a user
+  had 0.072 SOL of basket exposure, but their wallet didn't actually hold
+  the BONK / mSOL / JitoSOL behind it, so Jupiter's Metis router refused
+  to build the sell with "Insufficient funds".
+
+  Follow-up fix: have the server read the user's *actual* SPL token
+  balances when computing `availableToWithdraw`, then return the lower of
+  (ledger claim, on-chain reality). This matches what Jupiter will
+  actually find at sell time and turns the failure mode from a confusing
+  Jupiter error into a clean upfront "you can sell N of the M your ledger
+  claims" message. Pure server-side change — no wallet, no PDA, no
+  custodial risk added.
+
+  Intentionally not blocking the hackathon submission since the current
+  behaviour fails loudly with a friendly message ("you may have moved
+  these tokens outside Demutual"). Post-launch hardening.
