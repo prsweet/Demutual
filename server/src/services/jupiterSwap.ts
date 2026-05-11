@@ -167,7 +167,38 @@ export async function jupiterOrder(params: {
     }
     throw new Error(`JUPITER_ORDER_HTTP_${res.status}: ${t.slice(0, 400)}`);
   }
-  return (await res.json()) as { transaction: string; requestId: string; outAmount: string; otherAmountThreshold?: string };
+  // Jupiter v2 /order can return 200 OK with no `transaction` field — typically when the
+  // router built a quote but the taker's wallet doesn't actually hold the input asset
+  // ("Insufficient funds" on ExactOut), or when JupiterZ/RFQ accepted the quote but
+  // can't commit a swap. Distinguish the two so the FE shows the right friendly message.
+  const data = (await res.json()) as {
+    transaction?: unknown;
+    requestId?: unknown;
+    outAmount?: unknown;
+    otherAmountThreshold?: unknown;
+    error?: unknown;
+    router?: unknown;
+  };
+  const tx = typeof data.transaction === "string" ? data.transaction : "";
+  const reqId = typeof data.requestId === "string" ? data.requestId : "";
+  if (!tx || !reqId) {
+    const jupErr = typeof data.error === "string" ? data.error : "";
+    const lower = jupErr.toLowerCase();
+    if (lower.includes("insufficient")) {
+      throw new Error(
+        `JUPITER_TAKER_INSUFFICIENT_FUNDS: ${params.inputMint.slice(0, 6)}… (taker wallet doesn't hold enough input asset for this ${params.swapMode ?? "ExactIn"} quote)`
+      );
+    }
+    throw new Error(
+      `JUPITER_ORDER_NO_TX: swapMode=${params.swapMode ?? "ExactIn"} router=${typeof data.router === "string" ? data.router : "?"}${jupErr ? ` · jupiter: ${jupErr}` : ""}`
+    );
+  }
+  return {
+    transaction: tx,
+    requestId: reqId,
+    outAmount: typeof data.outAmount === "string" ? data.outAmount : "0",
+    ...(typeof data.otherAmountThreshold === "string" ? { otherAmountThreshold: data.otherAmountThreshold } : {})
+  };
 }
 
 export async function jupiterExecute(params: {

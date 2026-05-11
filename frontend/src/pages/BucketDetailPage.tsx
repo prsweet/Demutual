@@ -88,7 +88,9 @@ function errHint(code: string): string {
       "Amount is below this bucket's minimum. Each asset in the basket needs to receive at least the minimum trade size, so smaller baskets and lower allocations require a higher total amount.",
     WITHDRAW_EXCEEDS_POSITION: "You're trying to sell more than your current position in this bucket.",
     JUPITER_SELL_PLAN_FAILED:
-      "Jupiter couldn't build a sell route for one of the basket assets at this size. Memecoins and thin-liquidity pairs sometimes refuse ExactOut sells at small amounts. Try raising the sell amount or raising slippage (3–5%)."
+      "Jupiter couldn't build a sell route for one of the basket assets at this size. Memecoins and thin-liquidity pairs sometimes refuse ExactOut sells at small amounts. Try raising the sell amount or raising slippage (3–5%).",
+    WALLET_MISSING_BASKET_ASSETS:
+      "Your wallet doesn't actually hold enough of the basket assets to complete this sell. This usually means you've moved or sold one of the underlying tokens outside Demutual. We can only group-sell tokens you still hold — top them back up and try again, or sell only the portion you still own."
   };
   return m[code] ?? code;
 }

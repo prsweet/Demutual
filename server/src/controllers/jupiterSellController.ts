@@ -222,6 +222,10 @@ const buildJupiterSellPlan = async ({
           where: { id: attempt.id },
           data: { status: "ABANDONED", abandonedAt: new Date() }
         });
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.startsWith("JUPITER_TAKER_INSUFFICIENT_FUNDS")) {
+          return status(400, response(false, null, errors.walletMissingBasketAssets400));
+        }
         return status(400, response(false, null, errors.jupiterSellPlan400));
       }
     }

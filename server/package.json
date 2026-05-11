@@ -10,7 +10,7 @@
     "typescript": "^5"
   },
   "scripts": {
-    "dev": "bun src/index.ts",
+    "dev": "bun --hot src/index.ts",
     "test": "bun test",
     "db:generate": "bunx --bun prisma generate",
     "db:push": "bunx --bun prisma db push"
