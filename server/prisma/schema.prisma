@@ -70,8 +70,22 @@ model Asset {
     symbol String
     iconUrl String
     decimals Int @default(9)
+    category String @default("token")
+    inCatalog Boolean @default(false)
+    /// Jupiter Tokens v2 — true if Jupiter has the token on its verified/strict list.
+    isVerified Boolean @default(false)
+    /// Derived from Jupiter audit fields (mint auth on, freeze auth on, top holder concentration).
+    isSus Boolean @default(false)
+    /// Jupiter organic activity score, 0–100.
+    organicScore Float?
+    /// Jupiter's bucket label for organicScore: "high" / "medium" / "low".
+    organicScoreLabel String?
+    /// Jupiter tags ("verified", "strict", "lst", etc.) — stored verbatim for filtering / future use.
+    tags Json?
+    /// When the row was last reconciled against Jupiter Tokens v2.
+    lastSyncedAt DateTime?
     listing Listing[]
-    // think about what the asset will contain
+    @@index([inCatalog, category])
 }
 
 model Listing {

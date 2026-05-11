@@ -11,5 +11,6 @@ assetRoutes.group("/assets", (app) => {
   app.onBeforeHandle(authMiddlewares.requireAuth);
   app.get("/", assetControllers.listAssets);
   app.post("/", assetControllers.upsertAsset, { body: upsertAssetSchema });
+  app.post("/sync-catalog", assetControllers.resyncCatalog);
   return app;
 });

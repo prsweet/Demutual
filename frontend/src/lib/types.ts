@@ -11,6 +11,13 @@ export type MeUser = {
   counts?: { buckets: number; deposits: number; withdrawals: number };
 };
 
+export type BucketLimits = {
+  /** Smallest per-leg lamports Jupiter will reliably route. */
+  minLegLamports: number;
+  /** Smallest total swap (lamports) for buy or sell so every leg meets minLegLamports. */
+  minSwapLamports: number;
+};
+
 export type ApiBucket = {
   id: string;
   name: string;
@@ -24,6 +31,7 @@ export type ApiBucket = {
   listing?: { id: string; assetId: string; percentage: string | number; asset?: unknown }[];
   creator?: { id: string; username: string; walletAddress: string };
   _count?: { deposits: number; listing: number };
+  limits?: BucketLimits;
 };
 
 export type BucketsPage = {
@@ -43,6 +51,9 @@ export type CatalogAsset = {
   iconUrl: string;
   decimals: number;
   category: CatalogCategory;
+  /** Jupiter market cap (USD). Used to rank top tokens per category. Optional — missing for unranked. */
+  mcap?: number;
+  usdPrice?: number;
 };
 
 export const CATALOG_CATEGORY_ORDER: CatalogCategory[] = ["stablecoin", "yield", "token", "nft"];

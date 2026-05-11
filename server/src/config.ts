@@ -38,6 +38,35 @@ function bpsFromEnv(name: string): number {
   return Math.min(Math.floor(n), 1500);
 }
 
+/**
+ * Minimum lamports per Jupiter swap leg. Jupiter routes fail below this on ExactOut
+ * (and become route-starved on ExactIn), so we floor the per-leg amount. Total minimum
+ * swap is then `minLegLamports * 100 / smallestListingPct`. Tunable via env.
+ */
+export function minLegLamports(): number {
+  const n = Number(process.env.MIN_LEG_LAMPORTS);
+  if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  return 10_000_000; // 0.01 SOL
+}
+
+/**
+ * Smallest total-swap amount such that every leg in the bucket meets `minLegLamports()`.
+ * Returns `minLegLamports` when there are no usable listings.
+ */
+export function minSwapLamportsForBucket(
+  listing: { percentage: { toString(): string } | number | null }[]
+): number {
+  const legMin = minLegLamports();
+  if (!listing.length) return legMin;
+  let smallestPct = 100;
+  for (const l of listing) {
+    const p = Number(l.percentage ?? 0);
+    if (p > 0 && p < smallestPct) smallestPct = p;
+  }
+  if (!Number.isFinite(smallestPct) || smallestPct <= 0) return legMin;
+  return Math.ceil((legMin * 100) / smallestPct);
+}
+
 /** Basis points of the gross SOL amount routed as protocol fee on Jupiter swaps. 0 disables. */
 export function platformFeeBps(): number {
   return bpsFromEnv("PLATFORM_FEE_BPS");

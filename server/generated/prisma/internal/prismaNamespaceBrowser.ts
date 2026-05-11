@@ -131,7 +131,15 @@ export const AssetScalarFieldEnum = {
   name: 'name',
   symbol: 'symbol',
   iconUrl: 'iconUrl',
-  decimals: 'decimals'
+  decimals: 'decimals',
+  category: 'category',
+  inCatalog: 'inCatalog',
+  isVerified: 'isVerified',
+  isSus: 'isSus',
+  organicScore: 'organicScore',
+  organicScoreLabel: 'organicScoreLabel',
+  tags: 'tags',
+  lastSyncedAt: 'lastSyncedAt'
 } as const
 
 export type AssetScalarFieldEnum = (typeof AssetScalarFieldEnum)[keyof typeof AssetScalarFieldEnum]

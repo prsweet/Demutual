@@ -44,8 +44,12 @@ import {
   solToLamports,
   walletSendSolTransfer
 } from "../lib/solanaWallet";
-import { getJupiterSubmitRpcUrl, getSolanaRpcUrl, resolveTreasuryPubkey, setTreasuryInStorage } from "../lib/env";
-import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { getJupiterSubmitRpcUrl, getSolanaRpcUrl, resolveTreasuryPubkey, rpcDisplayHost, setTreasuryInStorage } from "../lib/env";
+import { formatAsOf, formatSol, formatUsd, lamportsToSol, solToUsd } from "../lib/money";
+import { displayTokenName, displayTokenSymbol } from "../lib/tokenLabels";
+import { SOL_MINT, usePrices } from "../lib/usePrices";
+import { useTokenInfo } from "../lib/useTokenInfo";
+import { ArrowLeft, Loader2, AlertCircle, ShieldCheck, ShieldAlert } from "lucide-react";
 
 const DRAFT_LS = "demutual_draft_bucket_id";
 
@@ -56,7 +60,10 @@ function errHint(code: string): string {
     BUCKET_NOT_OPEN_FOR_INVESTMENT: "Bucket must be published to invest.",
     UNAUTHORIZED: "Sign in again.",
     WALLET_NO_SIGN_VERSIONED: "Wallet cannot sign versioned txs — try Phantom.",
-    WALLET_NO_TRANSACTION_SUPPORT: "Wallet cannot send SOL transfers — try Phantom or Backpack."
+    WALLET_NO_TRANSACTION_SUPPORT: "Wallet cannot send SOL transfers — try Phantom or Backpack.",
+    AMOUNT_BELOW_BUCKET_MINIMUM:
+      "Amount is below this bucket's minimum. Each asset in the basket needs to receive at least the minimum trade size, so smaller baskets and lower allocations require a higher total amount.",
+    WITHDRAW_EXCEEDS_POSITION: "You're trying to sell more than your current position in this bucket."
   };
   return m[code] ?? code;
 }
@@ -70,6 +77,27 @@ function hintIfRentError(message: string): string | null {
     ].join(" ");
   }
   return null;
+}
+
+/**
+ * Sell-time wallet check. If Jupiter execute fails with insufficient-funds on the input
+ * token, the user likely sold the underlying assets outside Demutual — our ledger still
+ * shows position because we don't track wallet balances directly.
+ */
+function hintIfMissingBasketAssets(message: string): string | null {
+  if (!message) return null;
+  const m = message.toLowerCase();
+  const hits =
+    m.includes("insufficient funds") ||
+    m.includes("custom program error: 0x1") ||
+    m.includes("insufficient lamports") ||
+    m.includes("transfer: insufficient");
+  if (!hits) return null;
+  return [
+    "Your wallet doesn't hold enough of the basket assets to complete this sell.",
+    "This usually means you've sold or moved one of the underlying tokens outside Demutual.",
+    "We can only group-sell tokens you still hold — top those tokens back up and try again, or sell a smaller amount."
+  ].join(" ");
 }
 
 function formatBaseUnits(amount: string | number | undefined, decimals: number, fractionDigits = 4): string {
@@ -121,6 +149,18 @@ export function BucketDetailPage() {
   } | null>(null);
 
   const id = routeId?.trim() ?? "";
+
+  /** USD pricing for SOL + every listing mint — display only, refreshes every ~30s. */
+  const listingMints = (bucket?.listing ?? [])
+    .map((l) => l.assetId)
+    .filter((m): m is string => typeof m === "string" && m.length > 0);
+  const priceMints = Array.from(new Set([SOL_MINT, ...listingMints]));
+  const { prices: priceMap, asOf: priceAsOf } = usePrices(priceMints);
+  const solUsd = priceMap[SOL_MINT]?.price ?? null;
+  const asOfLine = formatAsOf(priceAsOf);
+
+  /** Verification + sus flags from Jupiter Tokens v2 for educational badges in the allocations list. */
+  const { tokens: tokenInfoMap } = useTokenInfo(listingMints);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -485,7 +525,7 @@ export function BucketDetailPage() {
   /** Sign + submit + confirm a batch of sell legs in parallel, then report per-leg outcomes. */
   const runSellLegs = async (params: {
     attemptId: string;
-    legs: { legId: string; symbol?: string | null; swapTransactionBase64: string }[];
+    legs: { legId: string; symbol?: string | null; swapTransactionBase64: string; requestId?: string }[];
     feeTransferSignature?: string;
   }): Promise<{
     attemptStatus: "PENDING" | "PARTIAL" | "COMPLETE" | "ABANDONED";
@@ -496,32 +536,39 @@ export function BucketDetailPage() {
       throw new Error("Wallet disconnected — connect and retry.");
     }
 
-    const jupRpc = getJupiterSubmitRpcUrl();
-    const connection = new Connection(jupRpc, "confirmed");
-
     setBusy(`Sign ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} in wallet…`);
     const vtxs = params.legs.map((leg) =>
       VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
     );
     const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
 
-    setBusy(`Submitting ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} to Solana…`);
+    setBusy(`Executing ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} via Jupiter…`);
     const settled = await Promise.allSettled(
-      signedB64.map((b64) => sendAndConfirmSignedB64Parallel(connection, [b64]))
+      params.legs.map((leg, i) =>
+        postJupiterInvestExecute(bucket.id, {
+          signedTransaction: signedB64[i]!,
+          requestId: leg.requestId ?? ""
+        })
+      )
     );
 
     const legResults: BasketLegResult[] = params.legs.map((leg, i) => {
       const r = settled[i]!;
-      if (r.status === "fulfilled" && r.value[0]) {
-        return { legId: leg.legId, status: "SUCCESS", signature: r.value[0] };
+      if (r.status === "fulfilled") {
+        if (r.value.status === "Success" && r.value.signature) {
+          return { legId: leg.legId, status: "SUCCESS", signature: r.value.signature };
+        }
+        return {
+          legId: leg.legId,
+          status: "FAILED",
+          error: r.value.error || `JUPITER_EXECUTE_FAILED_${r.value.code}`
+        };
       }
-      const err =
-        r.status === "rejected"
-          ? r.reason instanceof Error
-            ? r.reason.message
-            : String(r.reason)
-          : "UNKNOWN_SELL_FAILURE";
-      return { legId: leg.legId, status: "FAILED", error: err };
+      return {
+        legId: leg.legId,
+        status: "FAILED",
+        error: r.reason instanceof Error ? r.reason.message : String(r.reason)
+      };
     });
 
     setBusy("Recording withdrawal…");
@@ -568,7 +615,8 @@ export function BucketDetailPage() {
         .map((l) => ({
           legId: l.legId,
           symbol: l.symbol ?? null,
-          swapTransactionBase64: l.swapTransactionBase64
+          swapTransactionBase64: l.swapTransactionBase64,
+          requestId: l.requestId
         }));
       if (swaps.length === 0) {
         setError("No sell legs returned.");
@@ -613,7 +661,7 @@ export function BucketDetailPage() {
       await loadResumableAttempts();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(hintIfRentError(msg) || errHint(msg) || msg);
+      setError(hintIfMissingBasketAssets(msg) || hintIfRentError(msg) || errHint(msg) || msg);
     } finally {
       setBusy(null);
     }
@@ -635,7 +683,8 @@ export function BucketDetailPage() {
       const swaps = resume.legs.map((l) => ({
         legId: l.legId,
         symbol: l.symbol ?? null,
-        swapTransactionBase64: l.swapTransactionBase64
+        swapTransactionBase64: l.swapTransactionBase64,
+        requestId: l.requestId
       }));
       const { attemptStatus, legs: legResults } = await runSellLegs({
         attemptId,
@@ -664,7 +713,7 @@ export function BucketDetailPage() {
       await loadResumableAttempts();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(hintIfRentError(msg) || errHint(msg) || msg);
+      setError(hintIfMissingBasketAssets(msg) || hintIfRentError(msg) || errHint(msg) || msg);
     } finally {
       setBusy(null);
     }
@@ -732,9 +781,28 @@ export function BucketDetailPage() {
           >
             <h1 className="text-[24px] font-semibold text-[#1a1c1e] mb-1">{bucket.name}</h1>
             <p className="text-[13px] text-[#6b7280] font-mono mb-4 break-all">id: {bucket.id}</p>
-            <p className="text-[15px] text-[#374151] mb-2">
-              {bucket.type} · TVL {String(bucket.tvl)} · Est. APY {String(bucket.estimated_apy)}%
-            </p>
+            {(() => {
+              const tvlSol = Number(bucket.tvl);
+              const tvlUsd = solToUsd(tvlSol, solUsd);
+              return (
+                <div className="mb-2">
+                  <p className="text-[15px] text-[#374151]">
+                    {bucket.type} · TVL{" "}
+                    <span className="font-semibold text-[#1a1c1e]">{formatUsd(tvlUsd)}</span>
+                    <span className="text-[#6b7280]">
+                      {" "}
+                      ({tvlSol.toFixed(6)} SOL)
+                    </span>{" "}
+                    · Est. APY {String(bucket.estimated_apy)}%
+                  </p>
+                  {tvlUsd !== null && asOfLine && (
+                    <p className="text-[11px] text-[#9ca3af] mt-0.5">
+                      USD figures {asOfLine} — actual fills depend on slippage at execution.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
 
@@ -879,13 +947,66 @@ export function BucketDetailPage() {
 
             <h2 className="text-[15px] font-semibold text-[#374151] mb-3">Allocations</h2>
             <ul className="space-y-2 text-[14px] text-[#6b7280]">
-              {(bucket.listing ?? []).map((l) => (
-                <li key={l.id} className="flex justify-between gap-4">
-                  <span>{(l.asset as { symbol?: string } | undefined)?.symbol ?? l.assetId.slice(0, 8)}…</span>
-                  <span className="font-medium text-[#1a1c1e]">{String(l.percentage)}%</span>
-                </li>
-              ))}
+              {(bucket.listing ?? []).map((l) => {
+                const asset = (l.asset as { symbol?: string; name?: string } | undefined);
+                const info = tokenInfoMap[l.assetId] ?? null;
+                const rawSymbol = info?.symbol ?? asset?.symbol ?? l.assetId.slice(0, 8) + "…";
+                const rawName = info?.name ?? asset?.name ?? null;
+                const symbol = displayTokenSymbol(l.assetId, rawSymbol) ?? rawSymbol;
+                const name = displayTokenName(l.assetId, rawName);
+                const pct = Number(l.percentage);
+                const tvlSol = Number(bucket.tvl);
+                const allocationSol = Number.isFinite(pct) && Number.isFinite(tvlSol) ? (tvlSol * pct) / 100 : null;
+                const allocationUsd = allocationSol !== null ? solToUsd(allocationSol, solUsd) : null;
+                const isSol = l.assetId === SOL_MINT;
+                // SOL is universally trusted; show verified for it even when token-info hasn't loaded.
+                const verified = isSol || info?.isVerified;
+                const sus = !isSol && info?.isSus;
+                return (
+                  <li key={l.id} className="flex items-start justify-between gap-4 py-1.5 border-b border-black/5 last:border-b-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-[#1a1c1e]">{symbol}</span>
+                      {name && name !== symbol && (
+                        <span className="text-[12px] text-[#9ca3af] truncate">{name}</span>
+                      )}
+                      {verified && (
+                        <span
+                          title={
+                            info?.organicScoreLabel
+                              ? `Jupiter-verified token — community trust score: ${info.organicScoreLabel}.`
+                              : "Jupiter-verified token — confirmed real, not a scam."
+                          }
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200"
+                        >
+                          <ShieldCheck className="w-3 h-3" /> verified
+                        </span>
+                      )}
+                      {sus && (
+                        <span
+                          title="Not on Jupiter's verified list and has on-chain risk signals (mint or freeze authority still enabled, or extreme holder concentration). Treat with caution."
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-semibold border border-red-200"
+                        >
+                          <ShieldAlert className="w-3 h-3" /> caution
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[14px] font-semibold text-[#1a1c1e]">{pct}%</div>
+                      {allocationUsd !== null && (
+                        <div className="text-[11px] text-[#9ca3af] font-mono">
+                          {formatUsd(allocationUsd)} of TVL
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
+            {asOfLine && solUsd !== null && (
+              <p className="text-[11px] text-[#9ca3af] mt-2">
+                Allocation USD values reflect current bucket TVL × weight, {asOfLine}. Verified/caution badges from Jupiter Tokens v2.
+              </p>
+            )}
 
             {user && published && (
               <>
@@ -904,11 +1025,30 @@ export function BucketDetailPage() {
                   Refresh position
                 </button>
                 {positionErr && <p className="text-[13px] text-red-700 mb-2">{positionErr}</p>}
-                {position && (
-                  <pre className="text-[12px] bg-white/80 rounded-lg p-3 border border-black/5 overflow-x-auto">
-                    {JSON.stringify(position, null, 2)}
-                  </pre>
-                )}
+                {position && (() => {
+                  const depUsd = solToUsd(position.totalDeposited, solUsd);
+                  const wdUsd = solToUsd(position.totalWithdrawn, solUsd);
+                  const availUsd = solToUsd(position.availableToWithdraw, solUsd);
+                  const Row = ({ label, sol, usd }: { label: string; sol: number; usd: number | null }) => (
+                    <div className="flex items-baseline justify-between py-1.5 border-b border-black/5 last:border-b-0">
+                      <span className="text-[13px] text-[#6b7280]">{label}</span>
+                      <span className="text-right">
+                        <span className="text-[14px] font-semibold text-[#1a1c1e]">{formatUsd(usd)}</span>
+                        <span className="text-[12px] text-[#9ca3af] ml-2 font-mono">{formatSol(sol)}</span>
+                      </span>
+                    </div>
+                  );
+                  return (
+                    <div className="bg-white/80 rounded-lg p-3 border border-black/5">
+                      <Row label="Total deposited" sol={position.totalDeposited} usd={depUsd} />
+                      <Row label="Total withdrawn" sol={position.totalWithdrawn} usd={wdUsd} />
+                      <Row label="Available to withdraw" sol={position.availableToWithdraw} usd={availUsd} />
+                      {asOfLine && solUsd !== null && (
+                        <p className="text-[11px] text-[#9ca3af] mt-2">USD figures {asOfLine}.</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </>
             )}
 
@@ -954,18 +1094,44 @@ export function BucketDetailPage() {
                 <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
                 <h2 className="text-[15px] font-semibold text-[#374151] mb-2">Jupiter basket buy (mainnet)</h2>
                 <p className="text-[13px] text-[#6b7280] mb-4">
-                  Submit txs on {getJupiterSubmitRpcUrl()}. Fee transfer may be required first.
+                  Submit txs on {rpcDisplayHost(getJupiterSubmitRpcUrl())}. Fee transfer may be required first.
                 </p>
-                <input
-                  type="number"
-                  step="any"
-                  value={jupiterSol}
-                  onChange={(e) => {
-                    setJupiterSol(e.target.value);
-                    setJupiterBuyPlan(null); // Reset plan if input changes
-                  }}
-                  className="w-full max-w-[200px] mb-3 px-3 py-2 rounded-[10px] border border-black/10 bg-white"
-                />
+                {(() => {
+                  const buySol = parseFloat(jupiterSol);
+                  const buyUsd = Number.isFinite(buySol) ? solToUsd(buySol, solUsd) : null;
+                  const minSwapSol = bucket.limits ? lamportsToSol(bucket.limits.minSwapLamports) : 0;
+                  const minSwapUsd = solToUsd(minSwapSol, solUsd);
+                  const belowMin = Number.isFinite(buySol) && buySol > 0 && minSwapSol > 0 && buySol < minSwapSol;
+                  return (
+                    <>
+                      <label className="block text-[12px] text-[#6b7280] mb-1">Amount to invest (SOL)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min={minSwapSol || 0}
+                        value={jupiterSol}
+                        onChange={(e) => {
+                          setJupiterSol(e.target.value);
+                          setJupiterBuyPlan(null);
+                        }}
+                        className="w-full max-w-[200px] px-3 py-2 rounded-[10px] border border-black/10 bg-white"
+                      />
+                      <p className="text-[12px] text-[#6b7280] mt-1 mb-1">
+                        <span className="font-semibold text-[#1a1c1e]">{formatUsd(buyUsd)}</span>
+                        {asOfLine && solUsd !== null && (
+                          <span className="text-[11px] text-[#9ca3af]"> {asOfLine}</span>
+                        )}
+                      </p>
+                      {minSwapSol > 0 && (
+                        <p className={`text-[12px] mb-3 ${belowMin ? "text-red-600" : "text-[#6b7280]"}`}>
+                          Minimum for this basket: <span className="font-semibold">{formatUsd(minSwapUsd)}</span>{" "}
+                          <span className="text-[#9ca3af]">({minSwapSol.toFixed(6)} SOL)</span>
+                          {belowMin && " — increase the amount above to continue."}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
                 
                 {!jupiterBuyPlan ? (
                   <button
@@ -981,24 +1147,50 @@ export function BucketDetailPage() {
                     <h3 className="text-[14px] font-semibold text-blue-900 mb-3">Plan Preview</h3>
                     
                     <div className="space-y-3 mb-4">
-                      {jupiterBuyPlan.legs.map((leg, i) => (
-                        <div key={i} className="text-[13px] flex justify-between">
-                          <span className="text-blue-800 font-medium">
-                            {leg.kind === "swap" ? `Swap for ${leg.symbol}` : `Keep ${leg.symbol}`}
-                          </span>
-                          <span className="text-blue-900">
-                            {leg.kind === "swap"
-                              ? (() => {
-                                  const mint = leg.outputMint || "";
-                                  const row = (bucket?.listing ?? []).find((r) => r.assetId === mint);
-                                  const asset = row?.asset as { decimals?: number } | undefined;
-                                  const decimals = typeof asset?.decimals === "number" ? asset.decimals : mint ? 6 : 6;
-                                  return `~${formatBaseUnits(leg.expectedOutAmount, decimals, 4)}`;
-                                })()
-                              : `${((leg.inputLamports ?? 0) / 10**9).toFixed(4)} SOL`}
-                          </span>
-                        </div>
-                      ))}
+                      {jupiterBuyPlan.legs.map((leg, i) => {
+                        const mint = leg.outputMint || "";
+                        const row = (bucket?.listing ?? []).find((r) => r.assetId === mint);
+                        const asset = row?.asset as { decimals?: number; symbol?: string } | undefined;
+                        const info = mint ? tokenInfoMap[mint] : null;
+                        const decimals =
+                          info?.decimals ?? (typeof asset?.decimals === "number" ? asset.decimals : 6);
+                        const tokenPriceUsd = mint ? priceMap[mint]?.price ?? null : null;
+                        if (leg.kind === "swap") {
+                          const tokenAmount = (() => {
+                            const raw = leg.expectedOutAmount ?? "0";
+                            const n = Number(raw);
+                            if (!Number.isFinite(n) || decimals <= 0) return null;
+                            return n / Math.pow(10, decimals);
+                          })();
+                          const usd = tokenAmount !== null && tokenPriceUsd !== null ? tokenAmount * tokenPriceUsd : null;
+                          return (
+                            <div key={i} className="text-[13px] flex items-baseline justify-between">
+                              <span className="text-blue-800 font-medium">Swap for {leg.symbol}</span>
+                              <span className="text-right">
+                                {usd !== null && (
+                                  <span className="text-blue-900 font-semibold">{formatUsd(usd)}</span>
+                                )}
+                                <span className="text-blue-900/60 font-mono ml-2">
+                                  ~{formatBaseUnits(leg.expectedOutAmount, decimals, 4)}
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        }
+                        const solAmt = (leg.inputLamports ?? 0) / 1e9;
+                        const usd = solToUsd(solAmt, solUsd);
+                        return (
+                          <div key={i} className="text-[13px] flex items-baseline justify-between">
+                            <span className="text-blue-800 font-medium">Keep {leg.symbol}</span>
+                            <span className="text-right">
+                              {usd !== null && (
+                                <span className="text-blue-900 font-semibold">{formatUsd(usd)}</span>
+                              )}
+                              <span className="text-blue-900/60 font-mono ml-2">{solAmt.toFixed(4)} SOL</span>
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <div className="h-px w-full bg-blue-200/50 my-3" />
@@ -1039,43 +1231,58 @@ export function BucketDetailPage() {
                       const rentShare = swapLamports > 0 ? rentLamports / swapLamports : 0;
                       const inefficient = rentShare > 0.3 && rentLamports > 0;
                       const fmtSol = (lamports: number) => (lamports / 1e9).toFixed(6);
+                      const usdFor = (lamports: number) => solToUsd(lamports / 1e9, solUsd);
+                      const Row = ({ label, lamports, prefix = "" }: { label: React.ReactNode; lamports: number; prefix?: string }) => (
+                        <div className="flex justify-between items-baseline text-[12px] text-blue-800 mb-1">
+                          <span>{label}</span>
+                          <span className="text-right">
+                            <span className="font-semibold text-blue-900">
+                              {prefix}{formatUsd(usdFor(lamports))}
+                            </span>
+                            <span className="font-mono text-blue-900/60 ml-2">
+                              {prefix}{fmtSol(lamports)} SOL
+                            </span>
+                          </span>
+                        </div>
+                      );
                       return (
                         <div className="mt-3 rounded-lg border border-blue-300/70 bg-white/60 p-3">
                           <div className="text-[12px] font-semibold text-blue-900 mb-2">
                             Expected wallet debit
                           </div>
-                          <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                            <span>Swap input (basket allocation)</span>
-                            <span className="font-mono">{fmtSol(swapLamports)} SOL</span>
-                          </div>
+                          <Row label="Swap input (basket allocation)" lamports={swapLamports} />
                           {rentLamports > 0 && (
-                            <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                              <span>
-                                One-time token-account rent
-                                <span className="text-blue-900/60">
-                                  {" "}
-                                  ({jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0} new account
-                                  {(jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0) === 1 ? "" : "s"})
-                                </span>
-                              </span>
-                              <span className="font-mono">{fmtSol(rentLamports)} SOL</span>
-                            </div>
+                            <Row
+                              label={
+                                <>
+                                  One-time token-account rent
+                                  <span className="text-blue-900/60">
+                                    {" "}
+                                    ({jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0} new account
+                                    {(jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0) === 1 ? "" : "s"})
+                                  </span>
+                                </>
+                              }
+                              lamports={rentLamports}
+                            />
                           )}
                           {feeLamports > 0 && (
-                            <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                              <span>Platform/creator fee</span>
-                              <span className="font-mono">{fmtSol(feeLamports)} SOL</span>
-                            </div>
+                            <Row label="Platform/creator fee" lamports={feeLamports} />
                           )}
-                          <div className="flex justify-between text-[12px] text-blue-800 mb-2">
-                            <span>Estimated network fees</span>
-                            <span className="font-mono">~{fmtSol(networkFeeLamports)} SOL</span>
-                          </div>
-                          <div className="h-px w-full bg-blue-200/70 mb-2" />
-                          <div className="flex justify-between text-[13px] font-semibold text-blue-900">
+                          <Row label="Estimated network fees" lamports={networkFeeLamports} prefix="~" />
+                          <div className="h-px w-full bg-blue-200/70 my-2" />
+                          <div className="flex justify-between items-baseline text-[13px] font-semibold text-blue-900">
                             <span>Total expected debit</span>
-                            <span className="font-mono">~{fmtSol(totalLamports)} SOL</span>
+                            <span className="text-right">
+                              <span>~{formatUsd(usdFor(totalLamports))}</span>
+                              <span className="font-mono text-blue-900/60 ml-2">
+                                ~{fmtSol(totalLamports)} SOL
+                              </span>
+                            </span>
                           </div>
+                          {asOfLine && solUsd !== null && (
+                            <p className="text-[11px] text-blue-900/60 mt-1">USD figures {asOfLine}.</p>
+                          )}
                           {rentLamports > 0 && (
                             <div className="mt-2 text-[11px] text-blue-900/70 leading-snug">
                               Token-account rent is locked in your new token accounts and is{" "}
@@ -1119,21 +1326,72 @@ export function BucketDetailPage() {
                 <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
                 <h2 className="text-[15px] font-semibold text-[#374151] mb-2">Jupiter basket sell</h2>
                 <p className="text-[13px] text-[#6b7280] mb-4">Target SOL out; assets come from your wallet.</p>
-                <input
-                  type="number"
-                  step="any"
-                  value={sellSol}
-                  onChange={(e) => setSellSol(e.target.value)}
-                  className="w-full max-w-[200px] mb-3 px-3 py-2 rounded-[10px] border border-black/10 bg-white"
-                />
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void runJupiterSell()}
-                  className="px-5 py-2.5 rounded-[10px] bg-[#374151] text-white text-[14px] font-semibold disabled:opacity-50"
-                >
-                  Sell via Jupiter
-                </button>
+                {(() => {
+                  const max = position?.availableToWithdraw ?? 0;
+                  const maxUsd = solToUsd(max, solUsd);
+                  const parsed = parseFloat(sellSol);
+                  const overMax = Number.isFinite(parsed) && parsed > max + 1e-9;
+                  const nonPositive = !Number.isFinite(parsed) || parsed <= 0;
+                  const sellUsd = Number.isFinite(parsed) ? solToUsd(parsed, solUsd) : null;
+                  const minSwapSol = bucket.limits ? lamportsToSol(bucket.limits.minSwapLamports) : 0;
+                  const minSwapUsd = solToUsd(minSwapSol, solUsd);
+                  const belowMin =
+                    Number.isFinite(parsed) && parsed > 0 && minSwapSol > 0 && parsed < minSwapSol;
+                  return (
+                    <>
+                      <label className="block text-[12px] text-[#6b7280] mb-1">Amount to sell (SOL out)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          min={minSwapSol || 0}
+                          max={max}
+                          value={sellSol}
+                          onChange={(e) => setSellSol(e.target.value)}
+                          className="w-full max-w-[200px] px-3 py-2 rounded-[10px] border border-black/10 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSellSol(String(max))}
+                          disabled={max <= 0}
+                          className="px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[12px] font-semibold text-[#374151] disabled:opacity-50"
+                        >
+                          Max
+                        </button>
+                      </div>
+                      <p className="text-[12px] text-[#6b7280] mt-1 mb-1">
+                        <span className="font-semibold text-[#1a1c1e]">{formatUsd(sellUsd)}</span>
+                        {asOfLine && solUsd !== null && (
+                          <span className="text-[11px] text-[#9ca3af]"> {asOfLine}</span>
+                        )}
+                      </p>
+                      <p className="text-[12px] text-[#6b7280] mb-1">
+                        Available: <span className="font-semibold text-[#1a1c1e]">{formatUsd(maxUsd)}</span>{" "}
+                        <span className="text-[#9ca3af]">({max.toFixed(6)} SOL)</span>
+                      </p>
+                      {minSwapSol > 0 && (
+                        <p className={`text-[12px] mb-1 ${belowMin ? "text-red-600" : "text-[#6b7280]"}`}>
+                          Minimum: <span className="font-semibold">{formatUsd(minSwapUsd)}</span>{" "}
+                          <span className="text-[#9ca3af]">({minSwapSol.toFixed(6)} SOL)</span>
+                          {belowMin && " — increase the amount above to continue."}
+                        </p>
+                      )}
+                      {overMax && (
+                        <p className="text-[12px] text-red-600 mb-1">
+                          Exceeds your available position ({formatUsd(maxUsd)}).
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={Boolean(busy) || overMax || nonPositive || belowMin}
+                        onClick={() => void runJupiterSell()}
+                        className="mt-2 px-5 py-2.5 rounded-[10px] bg-[#374151] text-white text-[14px] font-semibold disabled:opacity-50"
+                      >
+                        Sell via Jupiter
+                      </button>
+                    </>
+                  );
+                })()}
               </>
             )}
 

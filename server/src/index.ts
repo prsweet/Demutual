@@ -7,6 +7,8 @@ import { authRoutes } from "./routes/authRoutes";
 import { assetRoutes } from "./routes/assetRoutes";
 import { bucketRoutes } from "./routes/bucketRoutes";
 import { devnetRoutes } from "./routes/devnetRoutes";
+import { priceRoutes } from "./routes/priceRoutes";
+import { tokenInfoRoutes } from "./routes/tokenInfoRoutes";
 import { attemptRoutes, userRoutes } from "./routes/userRoutes";
 import { errors, response } from "./types";
 import { authPlugin } from "./middlewares/auth";
@@ -84,6 +86,8 @@ async function bootstrap() {
     .use(attemptRoutes)
     .use(assetRoutes)
     .use(bucketRoutes)
+    .use(priceRoutes)
+    .use(tokenInfoRoutes)
     .use(devnetRoutes)
     .listen(serverPort(), () =>
       console.log(`Demutual API listening on http://localhost:${serverPort()} (GET /health)`)

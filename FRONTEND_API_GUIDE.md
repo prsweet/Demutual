@@ -135,3 +135,13 @@ type Asset = {
   decimals: number;
 }
 ```
+
+
+have to check it later
+
+curl -X POST
+  http://localhost:3000/assets/sync-catalog \
+    -H "Authorization: Bearer <your_jwt>"
+
+  Response will tell you how many came from Jupiter vs
+   fallback.

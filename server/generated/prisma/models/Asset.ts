@@ -28,10 +28,12 @@ export type AggregateAsset = {
 
 export type AssetAvgAggregateOutputType = {
   decimals: number | null
+  organicScore: number | null
 }
 
 export type AssetSumAggregateOutputType = {
   decimals: number | null
+  organicScore: number | null
 }
 
 export type AssetMinAggregateOutputType = {
@@ -40,6 +42,13 @@ export type AssetMinAggregateOutputType = {
   symbol: string | null
   iconUrl: string | null
   decimals: number | null
+  category: string | null
+  inCatalog: boolean | null
+  isVerified: boolean | null
+  isSus: boolean | null
+  organicScore: number | null
+  organicScoreLabel: string | null
+  lastSyncedAt: Date | null
 }
 
 export type AssetMaxAggregateOutputType = {
@@ -48,6 +57,13 @@ export type AssetMaxAggregateOutputType = {
   symbol: string | null
   iconUrl: string | null
   decimals: number | null
+  category: string | null
+  inCatalog: boolean | null
+  isVerified: boolean | null
+  isSus: boolean | null
+  organicScore: number | null
+  organicScoreLabel: string | null
+  lastSyncedAt: Date | null
 }
 
 export type AssetCountAggregateOutputType = {
@@ -56,16 +72,26 @@ export type AssetCountAggregateOutputType = {
   symbol: number
   iconUrl: number
   decimals: number
+  category: number
+  inCatalog: number
+  isVerified: number
+  isSus: number
+  organicScore: number
+  organicScoreLabel: number
+  tags: number
+  lastSyncedAt: number
   _all: number
 }
 
 
 export type AssetAvgAggregateInputType = {
   decimals?: true
+  organicScore?: true
 }
 
 export type AssetSumAggregateInputType = {
   decimals?: true
+  organicScore?: true
 }
 
 export type AssetMinAggregateInputType = {
@@ -74,6 +100,13 @@ export type AssetMinAggregateInputType = {
   symbol?: true
   iconUrl?: true
   decimals?: true
+  category?: true
+  inCatalog?: true
+  isVerified?: true
+  isSus?: true
+  organicScore?: true
+  organicScoreLabel?: true
+  lastSyncedAt?: true
 }
 
 export type AssetMaxAggregateInputType = {
@@ -82,6 +115,13 @@ export type AssetMaxAggregateInputType = {
   symbol?: true
   iconUrl?: true
   decimals?: true
+  category?: true
+  inCatalog?: true
+  isVerified?: true
+  isSus?: true
+  organicScore?: true
+  organicScoreLabel?: true
+  lastSyncedAt?: true
 }
 
 export type AssetCountAggregateInputType = {
@@ -90,6 +130,14 @@ export type AssetCountAggregateInputType = {
   symbol?: true
   iconUrl?: true
   decimals?: true
+  category?: true
+  inCatalog?: true
+  isVerified?: true
+  isSus?: true
+  organicScore?: true
+  organicScoreLabel?: true
+  tags?: true
+  lastSyncedAt?: true
   _all?: true
 }
 
@@ -185,6 +233,14 @@ export type AssetGroupByOutputType = {
   symbol: string
   iconUrl: string
   decimals: number
+  category: string
+  inCatalog: boolean
+  isVerified: boolean
+  isSus: boolean
+  organicScore: number | null
+  organicScoreLabel: string | null
+  tags: runtime.JsonValue | null
+  lastSyncedAt: Date | null
   _count: AssetCountAggregateOutputType | null
   _avg: AssetAvgAggregateOutputType | null
   _sum: AssetSumAggregateOutputType | null
@@ -216,6 +272,14 @@ export type AssetWhereInput = {
   symbol?: Prisma.StringFilter<"Asset"> | string
   iconUrl?: Prisma.StringFilter<"Asset"> | string
   decimals?: Prisma.IntFilter<"Asset"> | number
+  category?: Prisma.StringFilter<"Asset"> | string
+  inCatalog?: Prisma.BoolFilter<"Asset"> | boolean
+  isVerified?: Prisma.BoolFilter<"Asset"> | boolean
+  isSus?: Prisma.BoolFilter<"Asset"> | boolean
+  organicScore?: Prisma.FloatNullableFilter<"Asset"> | number | null
+  organicScoreLabel?: Prisma.StringNullableFilter<"Asset"> | string | null
+  tags?: Prisma.JsonNullableFilter<"Asset">
+  lastSyncedAt?: Prisma.DateTimeNullableFilter<"Asset"> | Date | string | null
   listing?: Prisma.ListingListRelationFilter
 }
 
@@ -225,6 +289,14 @@ export type AssetOrderByWithRelationInput = {
   symbol?: Prisma.SortOrder
   iconUrl?: Prisma.SortOrder
   decimals?: Prisma.SortOrder
+  category?: Prisma.SortOrder
+  inCatalog?: Prisma.SortOrder
+  isVerified?: Prisma.SortOrder
+  isSus?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrderInput | Prisma.SortOrder
+  organicScoreLabel?: Prisma.SortOrderInput | Prisma.SortOrder
+  tags?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   listing?: Prisma.ListingOrderByRelationAggregateInput
 }
 
@@ -237,6 +309,14 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   symbol?: Prisma.StringFilter<"Asset"> | string
   iconUrl?: Prisma.StringFilter<"Asset"> | string
   decimals?: Prisma.IntFilter<"Asset"> | number
+  category?: Prisma.StringFilter<"Asset"> | string
+  inCatalog?: Prisma.BoolFilter<"Asset"> | boolean
+  isVerified?: Prisma.BoolFilter<"Asset"> | boolean
+  isSus?: Prisma.BoolFilter<"Asset"> | boolean
+  organicScore?: Prisma.FloatNullableFilter<"Asset"> | number | null
+  organicScoreLabel?: Prisma.StringNullableFilter<"Asset"> | string | null
+  tags?: Prisma.JsonNullableFilter<"Asset">
+  lastSyncedAt?: Prisma.DateTimeNullableFilter<"Asset"> | Date | string | null
   listing?: Prisma.ListingListRelationFilter
 }, "id" | "id">
 
@@ -246,6 +326,14 @@ export type AssetOrderByWithAggregationInput = {
   symbol?: Prisma.SortOrder
   iconUrl?: Prisma.SortOrder
   decimals?: Prisma.SortOrder
+  category?: Prisma.SortOrder
+  inCatalog?: Prisma.SortOrder
+  isVerified?: Prisma.SortOrder
+  isSus?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrderInput | Prisma.SortOrder
+  organicScoreLabel?: Prisma.SortOrderInput | Prisma.SortOrder
+  tags?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.AssetCountOrderByAggregateInput
   _avg?: Prisma.AssetAvgOrderByAggregateInput
   _max?: Prisma.AssetMaxOrderByAggregateInput
@@ -262,6 +350,14 @@ export type AssetScalarWhereWithAggregatesInput = {
   symbol?: Prisma.StringWithAggregatesFilter<"Asset"> | string
   iconUrl?: Prisma.StringWithAggregatesFilter<"Asset"> | string
   decimals?: Prisma.IntWithAggregatesFilter<"Asset"> | number
+  category?: Prisma.StringWithAggregatesFilter<"Asset"> | string
+  inCatalog?: Prisma.BoolWithAggregatesFilter<"Asset"> | boolean
+  isVerified?: Prisma.BoolWithAggregatesFilter<"Asset"> | boolean
+  isSus?: Prisma.BoolWithAggregatesFilter<"Asset"> | boolean
+  organicScore?: Prisma.FloatNullableWithAggregatesFilter<"Asset"> | number | null
+  organicScoreLabel?: Prisma.StringNullableWithAggregatesFilter<"Asset"> | string | null
+  tags?: Prisma.JsonNullableWithAggregatesFilter<"Asset">
+  lastSyncedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Asset"> | Date | string | null
 }
 
 export type AssetCreateInput = {
@@ -270,6 +366,14 @@ export type AssetCreateInput = {
   symbol: string
   iconUrl: string
   decimals?: number
+  category?: string
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: number | null
+  organicScoreLabel?: string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Date | string | null
   listing?: Prisma.ListingCreateNestedManyWithoutAssetInput
 }
 
@@ -279,6 +383,14 @@ export type AssetUncheckedCreateInput = {
   symbol: string
   iconUrl: string
   decimals?: number
+  category?: string
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: number | null
+  organicScoreLabel?: string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Date | string | null
   listing?: Prisma.ListingUncheckedCreateNestedManyWithoutAssetInput
 }
 
@@ -288,6 +400,14 @@ export type AssetUpdateInput = {
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   iconUrl?: Prisma.StringFieldUpdateOperationsInput | string
   decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  inCatalog?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isSus?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organicScore?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  organicScoreLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   listing?: Prisma.ListingUpdateManyWithoutAssetNestedInput
 }
 
@@ -297,6 +417,14 @@ export type AssetUncheckedUpdateInput = {
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   iconUrl?: Prisma.StringFieldUpdateOperationsInput | string
   decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  inCatalog?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isSus?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organicScore?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  organicScoreLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   listing?: Prisma.ListingUncheckedUpdateManyWithoutAssetNestedInput
 }
 
@@ -306,6 +434,14 @@ export type AssetCreateManyInput = {
   symbol: string
   iconUrl: string
   decimals?: number
+  category?: string
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: number | null
+  organicScoreLabel?: string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Date | string | null
 }
 
 export type AssetUpdateManyMutationInput = {
@@ -314,6 +450,14 @@ export type AssetUpdateManyMutationInput = {
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   iconUrl?: Prisma.StringFieldUpdateOperationsInput | string
   decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  inCatalog?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isSus?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organicScore?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  organicScoreLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type AssetUncheckedUpdateManyInput = {
@@ -322,6 +466,14 @@ export type AssetUncheckedUpdateManyInput = {
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   iconUrl?: Prisma.StringFieldUpdateOperationsInput | string
   decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  inCatalog?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isSus?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organicScore?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  organicScoreLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type AssetCountOrderByAggregateInput = {
@@ -330,10 +482,19 @@ export type AssetCountOrderByAggregateInput = {
   symbol?: Prisma.SortOrder
   iconUrl?: Prisma.SortOrder
   decimals?: Prisma.SortOrder
+  category?: Prisma.SortOrder
+  inCatalog?: Prisma.SortOrder
+  isVerified?: Prisma.SortOrder
+  isSus?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrder
+  organicScoreLabel?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrder
 }
 
 export type AssetAvgOrderByAggregateInput = {
   decimals?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrder
 }
 
 export type AssetMaxOrderByAggregateInput = {
@@ -342,6 +503,13 @@ export type AssetMaxOrderByAggregateInput = {
   symbol?: Prisma.SortOrder
   iconUrl?: Prisma.SortOrder
   decimals?: Prisma.SortOrder
+  category?: Prisma.SortOrder
+  inCatalog?: Prisma.SortOrder
+  isVerified?: Prisma.SortOrder
+  isSus?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrder
+  organicScoreLabel?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrder
 }
 
 export type AssetMinOrderByAggregateInput = {
@@ -350,10 +518,18 @@ export type AssetMinOrderByAggregateInput = {
   symbol?: Prisma.SortOrder
   iconUrl?: Prisma.SortOrder
   decimals?: Prisma.SortOrder
+  category?: Prisma.SortOrder
+  inCatalog?: Prisma.SortOrder
+  isVerified?: Prisma.SortOrder
+  isSus?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrder
+  organicScoreLabel?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrder
 }
 
 export type AssetSumOrderByAggregateInput = {
   decimals?: Prisma.SortOrder
+  organicScore?: Prisma.SortOrder
 }
 
 export type AssetScalarRelationFilter = {
@@ -367,6 +543,22 @@ export type IntFieldUpdateOperationsInput = {
   decrement?: number
   multiply?: number
   divide?: number
+}
+
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
+export type NullableFloatFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
 }
 
 export type AssetCreateNestedOneWithoutListingInput = {
@@ -389,6 +581,14 @@ export type AssetCreateWithoutListingInput = {
   symbol: string
   iconUrl: string
   decimals?: number
+  category?: string
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: number | null
+  organicScoreLabel?: string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Date | string | null
 }
 
 export type AssetUncheckedCreateWithoutListingInput = {
@@ -397,6 +597,14 @@ export type AssetUncheckedCreateWithoutListingInput = {
   symbol: string
   iconUrl: string
   decimals?: number
+  category?: string
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: number | null
+  organicScoreLabel?: string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Date | string | null
 }
 
 export type AssetCreateOrConnectWithoutListingInput = {
@@ -421,6 +629,14 @@ export type AssetUpdateWithoutListingInput = {
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   iconUrl?: Prisma.StringFieldUpdateOperationsInput | string
   decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  inCatalog?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isSus?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organicScore?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  organicScoreLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type AssetUncheckedUpdateWithoutListingInput = {
@@ -429,6 +645,14 @@ export type AssetUncheckedUpdateWithoutListingInput = {
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   iconUrl?: Prisma.StringFieldUpdateOperationsInput | string
   decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  inCatalog?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isSus?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organicScore?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  organicScoreLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 
@@ -468,6 +692,14 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   symbol?: boolean
   iconUrl?: boolean
   decimals?: boolean
+  category?: boolean
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: boolean
+  organicScoreLabel?: boolean
+  tags?: boolean
+  lastSyncedAt?: boolean
   listing?: boolean | Prisma.Asset$listingArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["asset"]>
@@ -478,6 +710,14 @@ export type AssetSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   symbol?: boolean
   iconUrl?: boolean
   decimals?: boolean
+  category?: boolean
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: boolean
+  organicScoreLabel?: boolean
+  tags?: boolean
+  lastSyncedAt?: boolean
 }, ExtArgs["result"]["asset"]>
 
 export type AssetSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -486,6 +726,14 @@ export type AssetSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   symbol?: boolean
   iconUrl?: boolean
   decimals?: boolean
+  category?: boolean
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: boolean
+  organicScoreLabel?: boolean
+  tags?: boolean
+  lastSyncedAt?: boolean
 }, ExtArgs["result"]["asset"]>
 
 export type AssetSelectScalar = {
@@ -494,9 +742,17 @@ export type AssetSelectScalar = {
   symbol?: boolean
   iconUrl?: boolean
   decimals?: boolean
+  category?: boolean
+  inCatalog?: boolean
+  isVerified?: boolean
+  isSus?: boolean
+  organicScore?: boolean
+  organicScoreLabel?: boolean
+  tags?: boolean
+  lastSyncedAt?: boolean
 }
 
-export type AssetOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "symbol" | "iconUrl" | "decimals", ExtArgs["result"]["asset"]>
+export type AssetOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "symbol" | "iconUrl" | "decimals" | "category" | "inCatalog" | "isVerified" | "isSus" | "organicScore" | "organicScoreLabel" | "tags" | "lastSyncedAt", ExtArgs["result"]["asset"]>
 export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   listing?: boolean | Prisma.Asset$listingArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
@@ -515,6 +771,32 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     symbol: string
     iconUrl: string
     decimals: number
+    category: string
+    inCatalog: boolean
+    /**
+     * Jupiter Tokens v2 — true if Jupiter has the token on its verified/strict list.
+     */
+    isVerified: boolean
+    /**
+     * Derived from Jupiter audit fields (mint auth on, freeze auth on, top holder concentration).
+     */
+    isSus: boolean
+    /**
+     * Jupiter organic activity score, 0–100.
+     */
+    organicScore: number | null
+    /**
+     * Jupiter's bucket label for organicScore: "high" / "medium" / "low".
+     */
+    organicScoreLabel: string | null
+    /**
+     * Jupiter tags ("verified", "strict", "lst", etc.) — stored verbatim for filtering / future use.
+     */
+    tags: runtime.JsonValue | null
+    /**
+     * When the row was last reconciled against Jupiter Tokens v2.
+     */
+    lastSyncedAt: Date | null
   }, ExtArgs["result"]["asset"]>
   composites: {}
 }
@@ -944,6 +1226,14 @@ export interface AssetFieldRefs {
   readonly symbol: Prisma.FieldRef<"Asset", 'String'>
   readonly iconUrl: Prisma.FieldRef<"Asset", 'String'>
   readonly decimals: Prisma.FieldRef<"Asset", 'Int'>
+  readonly category: Prisma.FieldRef<"Asset", 'String'>
+  readonly inCatalog: Prisma.FieldRef<"Asset", 'Boolean'>
+  readonly isVerified: Prisma.FieldRef<"Asset", 'Boolean'>
+  readonly isSus: Prisma.FieldRef<"Asset", 'Boolean'>
+  readonly organicScore: Prisma.FieldRef<"Asset", 'Float'>
+  readonly organicScoreLabel: Prisma.FieldRef<"Asset", 'String'>
+  readonly tags: Prisma.FieldRef<"Asset", 'Json'>
+  readonly lastSyncedAt: Prisma.FieldRef<"Asset", 'DateTime'>
 }
     
 

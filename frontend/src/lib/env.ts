@@ -44,6 +44,15 @@ export function clearJupiterSubmitRpcUrlOverride(): void {
   localStorage.removeItem(JUPITER_RPC_LS);
 }
 
+/** Return only the host of an RPC URL — strips query strings that may contain API keys. */
+export function rpcDisplayHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 const TREASURY_LS = "demutual_invest_treasury";
 
 export function getTreasuryOverrideFromEnv(): string {

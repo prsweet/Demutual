@@ -1244,7 +1244,15 @@ export const AssetScalarFieldEnum = {
   name: 'name',
   symbol: 'symbol',
   iconUrl: 'iconUrl',
-  decimals: 'decimals'
+  decimals: 'decimals',
+  category: 'category',
+  inCatalog: 'inCatalog',
+  isVerified: 'isVerified',
+  isSus: 'isSus',
+  organicScore: 'organicScore',
+  organicScoreLabel: 'organicScoreLabel',
+  tags: 'tags',
+  lastSyncedAt: 'lastSyncedAt'
 } as const
 
 export type AssetScalarFieldEnum = (typeof AssetScalarFieldEnum)[keyof typeof AssetScalarFieldEnum]
@@ -1441,6 +1449,27 @@ export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
 
 
 /**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
+ * Reference to a field of type 'Float'
+ */
+export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+/**
+ * Reference to a field of type 'Float[]'
+ */
+export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
+
+
+/**
  * Reference to a field of type 'BucketType'
  */
 export type EnumBucketTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BucketType'>
@@ -1493,27 +1522,6 @@ export type EnumBasketLegStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$
  * Reference to a field of type 'BasketLegStatus[]'
  */
 export type ListEnumBasketLegStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketLegStatus[]'>
-    
-
-
-/**
- * Reference to a field of type 'Boolean'
- */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
-    
-
-
-/**
- * Reference to a field of type 'Float'
- */
-export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
-    
-
-
-/**
- * Reference to a field of type 'Float[]'
- */
-export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
     
 
 /**

@@ -1,6 +1,7 @@
 import { status, type Context } from "elysia";
-import { isDevnet } from "../config";
-import { TOKEN_CATALOG_BY_ID } from "../constants/tokenCatalog";
+import { isDevnet, minLegLamports, minSwapLamportsForBucket } from "../config";
+import { getCatalogToken } from "../constants/tokenCatalog";
+import { ensureCatalogReady } from "../services/catalogSync";
 import { INVEST_PROTOCOL_FEE_RATE } from "../constants/fees";
 import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestTransfer } from "../investTxVerify";
@@ -51,7 +52,14 @@ const getAllBuckets = async ({
         }
       })
     ]);
-    return status(200, response(true, toJsonSafe({ data: buckets, total, limit, offset }), null));
+    const decorated = buckets.map((b) => ({
+      ...b,
+      limits: {
+        minLegLamports: minLegLamports(),
+        minSwapLamports: minSwapLamportsForBucket(b.listing)
+      }
+    }));
+    return status(200, response(true, toJsonSafe({ data: decorated, total, limit, offset }), null));
   } catch (e) {
     console.error("[getAllBuckets]", e);
     return status(500, response(false, null, errors.serverError500));
@@ -108,7 +116,14 @@ const getBucketById = async ({
       }
     });
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
-    return status(200, response(true, toJsonSafe(bucket), null));
+    const decorated = {
+      ...bucket,
+      limits: {
+        minLegLamports: minLegLamports(),
+        minSwapLamports: minSwapLamportsForBucket(bucket.listing)
+      }
+    };
+    return status(200, response(true, toJsonSafe(decorated), null));
   } catch (e) {
     console.error("[getBucketById]", e);
     return status(500, response(false, null, errors.serverError500));
@@ -270,10 +285,13 @@ const addBucketAssets = async ({
       return status(400, response(false, null, errors.typeBox400));
     }
 
+    // Make sure the Jupiter-sourced catalog is loaded before we validate mints against it.
+    await ensureCatalogReady();
+
     for (const id of assetIds) {
       const exists = await prisma.asset.findUnique({ where: { id }, select: { id: true } });
       if (exists) continue;
-      if (!TOKEN_CATALOG_BY_ID.has(id)) {
+      if (!getCatalogToken(id)) {
         return status(400, response(false, null, errors.unknownAsset400));
       }
     }
@@ -282,14 +300,16 @@ const addBucketAssets = async ({
       for (const id of assetIds) {
         const existing = await tx.asset.findUnique({ where: { id } });
         if (existing) continue;
-        const meta = TOKEN_CATALOG_BY_ID.get(id)!;
+        const meta = getCatalogToken(id)!;
         await tx.asset.create({
           data: {
             id: meta.id,
             name: meta.name,
             symbol: meta.symbol,
             iconUrl: meta.iconUrl,
-            decimals: meta.decimals
+            decimals: meta.decimals,
+            category: meta.category,
+            inCatalog: true
           }
         });
       }

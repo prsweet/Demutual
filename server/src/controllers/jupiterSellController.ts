@@ -2,6 +2,7 @@ import { status, type Context } from "elysia";
 import {
   creatorFeeBps,
   isDevnet,
+  minSwapLamportsForBucket,
   platformFeeActive,
   platformFeeBps,
   platformFeeWallet
@@ -9,7 +10,7 @@ import {
 import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestFeeBundle } from "../investTxVerify";
 import { toJsonSafe } from "../jsonSafe";
-import { jupiterGetQuote, jupiterPostSwap, WSOL_MINT } from "../services/jupiterSwap";
+import { jupiterGetQuote, jupiterOrder, jupiterPostSwap, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
   type jupiterAttemptResumeSchema,
@@ -111,6 +112,11 @@ const buildJupiterSellPlan = async ({
       return status(400, response(false, null, errors.bucketNoAssets400));
     }
 
+    const minSwap = minSwapLamportsForBucket(listings);
+    if (total < minSwap) {
+      return status(400, response(false, null, errors.amountBelowMin400));
+    }
+
     const slippageBps = body.slippageBps ?? 80;
 
     // Pre-allocate the per-listing SOL targets so we can create the BasketAttempt + legs
@@ -188,16 +194,13 @@ const buildJupiterSellPlan = async ({
       const legRow = attempt.legs[i]!;
       const slot = swapSlots.find((s) => s.inMint === legRow.mint)!;
       try {
-        const quote = (await jupiterGetQuote({
+        const order = await jupiterOrder({
           inputMint: legRow.mint,
           outputMint: WSOL_MINT,
           amountLamports: Number(legRow.lamports),
           slippageBps,
-          swapMode: "ExactOut"
-        })) as { inAmount?: string };
-        const { swapTransaction } = await jupiterPostSwap({
-          quoteResponse: quote,
-          userPublicKey: user.walletAddress
+          swapMode: "ExactOut",
+          taker: user.walletAddress
         });
         legs.push({
           kind: "swap",
@@ -206,8 +209,9 @@ const buildJupiterSellPlan = async ({
           symbol: slot.symbol,
           percentage: slot.percentage,
           outputLamports: Number(legRow.lamports),
-          estInputAmount: String(quote.inAmount ?? "?"),
-          swapTransactionBase64: swapTransaction
+          estInputAmount: order.otherAmountThreshold || "?", // For ExactOut, otherAmountThreshold is max inAmount
+          swapTransactionBase64: order.transaction,
+          requestId: order.requestId
         });
         if (i < attempt.legs.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 600));
@@ -527,29 +531,28 @@ const resumeJupiterSellAttempt = async ({
       outputLamports: number;
       estInputAmount: string;
       swapTransactionBase64: string;
+      requestId?: string;
     };
     const legs: SellLegOut[] = [];
     for (let i = 0; i < toResume.length; i++) {
       const legRow = toResume[i]!;
       try {
-        const quote = (await jupiterGetQuote({
+        const order = await jupiterOrder({
           inputMint: legRow.mint,
           outputMint: WSOL_MINT,
           amountLamports: Number(legRow.lamports),
           slippageBps,
-          swapMode: "ExactOut"
-        })) as { inAmount?: string };
-        const { swapTransaction } = await jupiterPostSwap({
-          quoteResponse: quote,
-          userPublicKey: user.walletAddress
+          swapMode: "ExactOut",
+          taker: user.walletAddress
         });
         legs.push({
           legId: legRow.id,
           inputMint: legRow.mint,
           symbol: legRow.symbol,
           outputLamports: Number(legRow.lamports),
-          estInputAmount: String(quote.inAmount ?? "?"),
-          swapTransactionBase64: swapTransaction
+          estInputAmount: order.otherAmountThreshold || "?",
+          swapTransactionBase64: order.transaction,
+          requestId: order.requestId
         });
         if (i < toResume.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 600));

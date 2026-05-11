@@ -244,6 +244,7 @@ export const errors = {
   jupiterDevnetUnsupported400: "JUPITER_NOT_AVAILABLE_ON_DEVNET",
   jupiterSellPlan400: "JUPITER_SELL_PLAN_FAILED",
   jupiterSellNothingToSwap400: "JUPITER_SELL_NOTHING_TO_SWAP",
+  amountBelowMin400: "AMOUNT_BELOW_BUCKET_MINIMUM",
   sellTxDuplicate409: "SELL_TX_ALREADY_RECORDED",
   treasuryInvestDevnetOnly400: "TREASURY_INVEST_DEVNET_ONLY",
   feeTransferRequired400: "FEE_TRANSFER_SIGNATURE_REQUIRED",

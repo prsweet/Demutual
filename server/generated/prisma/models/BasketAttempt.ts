@@ -606,10 +606,6 @@ export type EnumBasketAttemptStatusFieldUpdateOperationsInput = {
   set?: $Enums.BasketAttemptStatus
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type BasketAttemptCreateNestedOneWithoutLegsInput = {
   create?: Prisma.XOR<Prisma.BasketAttemptCreateWithoutLegsInput, Prisma.BasketAttemptUncheckedCreateWithoutLegsInput>
   connectOrCreate?: Prisma.BasketAttemptCreateOrConnectWithoutLegsInput

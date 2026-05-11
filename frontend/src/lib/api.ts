@@ -171,6 +171,54 @@ export async function fetchMyPosition(bucketId: string): Promise<MyPosition> {
   return out.data;
 }
 
+export type PricesPayload = {
+  prices: Record<string, { price: number | null; confidence: string | null }>;
+  /** Oldest cache asOf among requested mints — drives the "as of HH:MM:SS" footnote. */
+  asOf: number;
+  staleMints: string[];
+};
+
+export async function fetchPrices(mints: string[]): Promise<PricesPayload> {
+  const unique = Array.from(new Set(mints.map((m) => m.trim()).filter(Boolean)));
+  if (unique.length === 0) return { prices: {}, asOf: Date.now(), staleMints: [] };
+  const res = await api.get<ApiResponse<PricesPayload>>("/prices", {
+    params: { mints: unique.join(",") }
+  });
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "PRICES_FAILED");
+  return out.data;
+}
+
+export type TokenInfo = {
+  mint: string;
+  name: string | null;
+  symbol: string | null;
+  iconUrl: string | null;
+  decimals: number | null;
+  isVerified: boolean;
+  isSus: boolean;
+  organicScore: number | null;
+  organicScoreLabel: string | null;
+  tags: string[];
+};
+
+export type TokenInfoPayload = {
+  tokens: Record<string, TokenInfo | null>;
+  asOf: number;
+  staleMints: string[];
+};
+
+export async function fetchTokenInfo(mints: string[]): Promise<TokenInfoPayload> {
+  const unique = Array.from(new Set(mints.map((m) => m.trim()).filter(Boolean)));
+  if (unique.length === 0) return { tokens: {}, asOf: Date.now(), staleMints: [] };
+  const res = await api.get<ApiResponse<TokenInfoPayload>>("/token-info", {
+    params: { mints: unique.join(",") }
+  });
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "TOKEN_INFO_FAILED");
+  return out.data;
+}
+
 export async function postLedgerWithdraw(bucketId: string, amount: number): Promise<unknown> {
   const res = await api.post<ApiResponse<unknown>>(`/buckets/${encodeURIComponent(bucketId)}/withdraw`, {
     amount
@@ -358,6 +406,7 @@ export async function postJupiterSellAttemptResume(
     outputLamports: number;
     estInputAmount: string;
     swapTransactionBase64: string;
+    requestId?: string;
   }[];
 }> {
   const res = await api.post<
@@ -371,6 +420,7 @@ export async function postJupiterSellAttemptResume(
         outputLamports: number;
         estInputAmount: string;
         swapTransactionBase64: string;
+        requestId?: string;
       }[];
     }>
   >(

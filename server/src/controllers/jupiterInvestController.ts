@@ -3,6 +3,7 @@ import {
   anyFeeActive,
   creatorFeeBps,
   isDevnet,
+  minSwapLamportsForBucket,
   platformFeeActive,
   platformFeeBps,
   platformFeeWallet
@@ -109,18 +110,28 @@ const buildJupiterPlan = async ({
       return status(400, response(false, null, errors.bucketNoAssets400));
     }
 
+    const minSwap = minSwapLamportsForBucket(listings);
+    if (swapLamports < minSwap) {
+      return status(400, response(false, null, errors.amountBelowMin400));
+    }
+
     const slippageBps = body.slippageBps ?? 80;
     const legs: PlanLeg[] = [];
     let allocated = 0;
     const n = listings.length;
 
     const rpcUrl = process.env.SOLANA_RPC_URL?.trim() || "";
+    // WSOL is handled transparently by Jupiter's wrap-and-unwrap; the user does not need
+    // a persistent WSOL ATA, so it must not appear in the rent pre-check.
+    const ataPrecheckMints = Array.from(
+      new Set(listings.map((l) => l.assetId).filter((m) => m && m !== WSOL_MINT))
+    );
     const ataRent =
-      rpcUrl && user.walletAddress
+      rpcUrl && user.walletAddress && ataPrecheckMints.length > 0
         ? await estimateMissingAtaRentLamports({
             rpcUrl,
             owner: user.walletAddress,
-            mints: [WSOL_MINT, ...listings.map((l) => l.assetId)]
+            mints: ataPrecheckMints
           }).catch((e) => {
             console.warn("[ataRent] check failed", e);
             return null;
@@ -669,6 +680,12 @@ const buildJupiterLegOrdersBatch = async ({
     const intendedSol = Number(body.intendedSol);
     if (!Number.isFinite(intendedSol) || intendedSol <= 0) {
       return status(400, response(false, null, errors.typeBox400));
+    }
+
+    const minSwap = minSwapLamportsForBucket(bucket.listing);
+    const intendedLamports = Math.floor(intendedSol * 1e9);
+    if (intendedLamports < minSwap) {
+      return status(400, response(false, null, errors.amountBelowMin400));
     }
 
     type LegOut = {
