@@ -58,6 +58,8 @@ export const ModelName = {
   Asset: 'Asset',
   Listing: 'Listing',
   Bucket: 'Bucket',
+  BasketAttempt: 'BasketAttempt',
+  BasketAttemptLeg: 'BasketAttemptLeg',
   Nonce: 'Nonce'
 } as const
 
@@ -155,10 +157,45 @@ export const BucketScalarFieldEnum = {
   estimated_apy: 'estimated_apy',
   type: 'type',
   metaData: 'metaData',
+  researchDoc: 'researchDoc',
   createdAt: 'createdAt'
 } as const
 
 export type BucketScalarFieldEnum = (typeof BucketScalarFieldEnum)[keyof typeof BucketScalarFieldEnum]
+
+
+export const BasketAttemptScalarFieldEnum = {
+  id: 'id',
+  bucketId: 'bucketId',
+  userId: 'userId',
+  direction: 'direction',
+  intendedSol: 'intendedSol',
+  slippageBps: 'slippageBps',
+  status: 'status',
+  abandonedAt: 'abandonedAt',
+  feeTransferSignature: 'feeTransferSignature',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BasketAttemptScalarFieldEnum = (typeof BasketAttemptScalarFieldEnum)[keyof typeof BasketAttemptScalarFieldEnum]
+
+
+export const BasketAttemptLegScalarFieldEnum = {
+  id: 'id',
+  attemptId: 'attemptId',
+  mint: 'mint',
+  symbol: 'symbol',
+  lamports: 'lamports',
+  legIndex: 'legIndex',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  lastError: 'lastError',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BasketAttemptLegScalarFieldEnum = (typeof BasketAttemptLegScalarFieldEnum)[keyof typeof BasketAttemptLegScalarFieldEnum]
 
 
 export const NonceScalarFieldEnum = {

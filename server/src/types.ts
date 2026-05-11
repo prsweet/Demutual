@@ -121,6 +121,13 @@ export const addBucketAssetsSchema = t.Object({
 
 export type addBucketAssetsSchema = Static<typeof addBucketAssetsSchema>;
 
+/** Markdown research document — trimmed length validated in controller (min 100). */
+export const publishBucketSchema = t.Object({
+  researchDoc: t.String({ maxLength: 65535 })
+});
+
+export type publishBucketSchema = Static<typeof publishBucketSchema>;
+
 export const idParamSchema = t.Object({
   id: t.String()
 });
@@ -191,6 +198,7 @@ export const errors = {
   bucketNotDraft400: "BUCKET_NOT_IN_DRAFT",
   bucketAlreadyPublished400: "BUCKET_ALREADY_PUBLISHED",
   bucketNoAssets400: "BUCKET_NEEDS_ASSETS_BEFORE_PUBLISH",
+  researchDocTooShort400: "RESEARCH_DOC_TOO_SHORT",
   unknownAsset400: "UNKNOWN_ASSET_ID_USE_CATALOG_OR_REGISTER",
   investNotConfigured503: "INVEST_CHAIN_NOT_CONFIGURED",
   investTxNotFound400: "INVEST_TX_NOT_FOUND",

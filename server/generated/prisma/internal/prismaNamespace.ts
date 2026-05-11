@@ -391,6 +391,8 @@ export const ModelName = {
   Asset: 'Asset',
   Listing: 'Listing',
   Bucket: 'Bucket',
+  BasketAttempt: 'BasketAttempt',
+  BasketAttemptLeg: 'BasketAttemptLeg',
   Nonce: 'Nonce'
 } as const
 
@@ -407,7 +409,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "deposit" | "withdrawal" | "history" | "asset" | "listing" | "bucket" | "nonce"
+    modelProps: "user" | "deposit" | "withdrawal" | "history" | "asset" | "listing" | "bucket" | "basketAttempt" | "basketAttemptLeg" | "nonce"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -929,6 +931,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    BasketAttempt: {
+      payload: Prisma.$BasketAttemptPayload<ExtArgs>
+      fields: Prisma.BasketAttemptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BasketAttemptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BasketAttemptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>
+        }
+        findFirst: {
+          args: Prisma.BasketAttemptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BasketAttemptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>
+        }
+        findMany: {
+          args: Prisma.BasketAttemptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>[]
+        }
+        create: {
+          args: Prisma.BasketAttemptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>
+        }
+        createMany: {
+          args: Prisma.BasketAttemptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BasketAttemptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>[]
+        }
+        delete: {
+          args: Prisma.BasketAttemptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>
+        }
+        update: {
+          args: Prisma.BasketAttemptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>
+        }
+        deleteMany: {
+          args: Prisma.BasketAttemptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BasketAttemptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BasketAttemptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>[]
+        }
+        upsert: {
+          args: Prisma.BasketAttemptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptPayload>
+        }
+        aggregate: {
+          args: Prisma.BasketAttemptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBasketAttempt>
+        }
+        groupBy: {
+          args: Prisma.BasketAttemptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BasketAttemptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BasketAttemptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BasketAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
+    BasketAttemptLeg: {
+      payload: Prisma.$BasketAttemptLegPayload<ExtArgs>
+      fields: Prisma.BasketAttemptLegFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BasketAttemptLegFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BasketAttemptLegFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>
+        }
+        findFirst: {
+          args: Prisma.BasketAttemptLegFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BasketAttemptLegFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>
+        }
+        findMany: {
+          args: Prisma.BasketAttemptLegFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>[]
+        }
+        create: {
+          args: Prisma.BasketAttemptLegCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>
+        }
+        createMany: {
+          args: Prisma.BasketAttemptLegCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BasketAttemptLegCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>[]
+        }
+        delete: {
+          args: Prisma.BasketAttemptLegDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>
+        }
+        update: {
+          args: Prisma.BasketAttemptLegUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>
+        }
+        deleteMany: {
+          args: Prisma.BasketAttemptLegDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BasketAttemptLegUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BasketAttemptLegUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>[]
+        }
+        upsert: {
+          args: Prisma.BasketAttemptLegUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BasketAttemptLegPayload>
+        }
+        aggregate: {
+          args: Prisma.BasketAttemptLegAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBasketAttemptLeg>
+        }
+        groupBy: {
+          args: Prisma.BasketAttemptLegGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BasketAttemptLegGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BasketAttemptLegCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BasketAttemptLegCountAggregateOutputType> | number
+        }
+      }
+    }
     Nonce: {
       payload: Prisma.$NoncePayload<ExtArgs>
       fields: Prisma.NonceFieldRefs
@@ -1120,10 +1270,45 @@ export const BucketScalarFieldEnum = {
   estimated_apy: 'estimated_apy',
   type: 'type',
   metaData: 'metaData',
+  researchDoc: 'researchDoc',
   createdAt: 'createdAt'
 } as const
 
 export type BucketScalarFieldEnum = (typeof BucketScalarFieldEnum)[keyof typeof BucketScalarFieldEnum]
+
+
+export const BasketAttemptScalarFieldEnum = {
+  id: 'id',
+  bucketId: 'bucketId',
+  userId: 'userId',
+  direction: 'direction',
+  intendedSol: 'intendedSol',
+  slippageBps: 'slippageBps',
+  status: 'status',
+  abandonedAt: 'abandonedAt',
+  feeTransferSignature: 'feeTransferSignature',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BasketAttemptScalarFieldEnum = (typeof BasketAttemptScalarFieldEnum)[keyof typeof BasketAttemptScalarFieldEnum]
+
+
+export const BasketAttemptLegScalarFieldEnum = {
+  id: 'id',
+  attemptId: 'attemptId',
+  mint: 'mint',
+  symbol: 'symbol',
+  lamports: 'lamports',
+  legIndex: 'legIndex',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  lastError: 'lastError',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BasketAttemptLegScalarFieldEnum = (typeof BasketAttemptLegScalarFieldEnum)[keyof typeof BasketAttemptLegScalarFieldEnum]
 
 
 export const NonceScalarFieldEnum = {
@@ -1270,6 +1455,48 @@ export type ListEnumBucketTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$P
 
 
 /**
+ * Reference to a field of type 'BasketDirection'
+ */
+export type EnumBasketDirectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketDirection'>
+    
+
+
+/**
+ * Reference to a field of type 'BasketDirection[]'
+ */
+export type ListEnumBasketDirectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketDirection[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BasketAttemptStatus'
+ */
+export type EnumBasketAttemptStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketAttemptStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'BasketAttemptStatus[]'
+ */
+export type ListEnumBasketAttemptStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketAttemptStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BasketLegStatus'
+ */
+export type EnumBasketLegStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketLegStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'BasketLegStatus[]'
+ */
+export type ListEnumBasketLegStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BasketLegStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
@@ -1406,6 +1633,8 @@ export type GlobalOmitConfig = {
   asset?: Prisma.AssetOmit
   listing?: Prisma.ListingOmit
   bucket?: Prisma.BucketOmit
+  basketAttempt?: Prisma.BasketAttemptOmit
+  basketAttemptLeg?: Prisma.BasketAttemptLegOmit
   nonce?: Prisma.NonceOmit
 }
 

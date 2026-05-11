@@ -195,7 +195,11 @@ export async function disconnectPhantom(): Promise<void> {
 }
 
 export function b64ToUint8Array(b64: string): Uint8Array {
-  const bin = atob(b64);
+  // Jupiter may return base64url (no padding, -/_ alphabet). Normalize to standard base64 for atob().
+  const raw = b64.trim();
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "===".slice((normalized.length + 3) % 4);
+  const bin = atob(padded);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;

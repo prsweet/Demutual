@@ -121,10 +121,10 @@ export async function setBucketAssetsApi(bucketId: string, assets: BucketAssetWe
   return out.data;
 }
 
-export async function publishBucketApi(bucketId: string): Promise<ApiBucket> {
+export async function publishBucketApi(bucketId: string, body: { researchDoc: string }): Promise<ApiBucket> {
   const res = await api.post<ApiResponse<ApiBucket>>(
     `/buckets/${encodeURIComponent(bucketId)}/creator/publish`,
-    {}
+    body
   );
   const out = res.data;
   if (!out.success || !out.data) throw new Error(out.error || "PUBLISH_FAILED");

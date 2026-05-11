@@ -5,13 +5,7 @@ import { BucketAssetPicker, type AssetRowSelection } from "../components/BucketA
 import { ArrowLeft, Save, Loader2, AlertCircle, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import {
-  createBucketApi,
-  fetchCatalog,
-  publishBucketApi,
-  setBucketAssetsApi,
-  upsertAssetApi
-} from "../lib/api";
+import { createBucketApi, fetchCatalog, setBucketAssetsApi, upsertAssetApi } from "../lib/api";
 import type { BucketAssetWeight, CatalogAsset } from "../lib/types";
 import { PublicKey } from "@solana/web3.js";
 
@@ -65,8 +59,6 @@ export function CreateBucketPage() {
   const [customIcon, setCustomIcon] = useState("");
   const [customDecimals, setCustomDecimals] = useState("9");
   const [registering, setRegistering] = useState(false);
-
-  const [publishAfterSave, setPublishAfterSave] = useState(false);
 
   const layoutUser = user ? { name: user.username, walletAddress: user.walletAddress } : undefined;
 
@@ -189,13 +181,7 @@ export function CreateBucketPage() {
         localStorage.setItem(DRAFT_LS, bucket.id);
       }
       await setBucketAssetsApi(bucket.id, collected.assets);
-      if (publishAfterSave) {
-        await publishBucketApi(bucket.id);
-        if (typeof localStorage !== "undefined") {
-          localStorage.removeItem(DRAFT_LS);
-        }
-      }
-      navigate("/", { replace: true });
+      navigate(`/buckets/${encodeURIComponent(bucket.id)}/research`, { replace: true });
     } catch (e) {
       const code = e instanceof Error ? e.message : String(e);
       setError(ERR_HINT[code] ?? code);
@@ -227,8 +213,8 @@ export function CreateBucketPage() {
           <div>
             <h1 className="text-[24px] font-semibold text-[#1a1c1e] tracking-tight mb-2">Create bucket</h1>
             <p className="text-[15px] text-[#6b7280] tracking-tight">
-              Same flow as the reference client: create a draft, attach catalog or custom mints with weights summing to{" "}
-              <span className="font-semibold text-[#374151]">100%</span>, then optionally publish to the marketplace.
+              Create a draft, attach catalog or custom mints with weights summing to{" "}
+              <span className="font-semibold text-[#374151]">100%</span>, then write your research document and publish.
             </p>
             {!user && (
               <p className="text-[14px] text-[#6b7280] mt-3 font-medium">Connect your wallet to register assets and save.</p>
@@ -358,18 +344,6 @@ export function CreateBucketPage() {
             </button>
           </div>
 
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={publishAfterSave}
-              onChange={(e) => setPublishAfterSave(e.target.checked)}
-              className="h-4 w-4 rounded border-black/20 accent-[#1a1c1e]"
-            />
-            <span className="text-[14px] font-medium text-[#374151]">
-              Publish to marketplace immediately (otherwise stays draft until you publish via API)
-            </span>
-          </label>
-
           <div className="pt-2 flex flex-wrap justify-end gap-3">
             <button
               type="button"
@@ -385,7 +359,7 @@ export function CreateBucketPage() {
               className="flex items-center gap-2 px-6 py-3 bg-[#1a1c1e] text-white rounded-[12px] text-[15px] font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#374151] transition-all"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {publishAfterSave ? "Create, save allocations & publish" : "Create draft & save allocations"}
+              Create draft & save allocations
             </button>
           </div>
         </div>

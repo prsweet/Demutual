@@ -21,6 +21,7 @@ export type ApiBucket = {
   estimated_apy: string | number;
   apy?: string | number | null;
   metaData?: { description?: string } | null;
+  researchDoc?: string | null;
   listing?: { id: string; assetId: string; percentage: string | number; asset?: unknown }[];
   creator?: { id: string; username: string; walletAddress: string };
   _count?: { deposits: number; listing: number };

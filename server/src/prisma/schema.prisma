@@ -94,6 +94,7 @@ model Bucket {
     estimated_apy Decimal
     type BucketType @default(DRAFT)
     metaData Json?
+    researchDoc String?
     createdAt DateTime @default(now())
     deposits Deposit[]
     withdrawals Withdrawal[]

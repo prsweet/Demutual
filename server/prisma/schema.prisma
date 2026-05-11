@@ -21,6 +21,7 @@ model User {
     history History[]
     deposits Deposit[]
     withdrawals Withdrawal[]
+    basketAttempts BasketAttempt[]
 }
 
 model Deposit {
@@ -94,15 +95,76 @@ model Bucket {
     estimated_apy Decimal
     type BucketType @default(DRAFT)
     metaData Json?
+    researchDoc String?
     createdAt DateTime @default(now())
     deposits Deposit[]
     withdrawals Withdrawal[]
+    basketAttempts BasketAttempt[]
     @@unique([creatorId, name, version])
 }
 
 enum BucketType {
     DRAFT
     PUBLISHED
+}
+
+/// A basket buy or sell intent. Tracks per-leg outcome so partial fills don't lie about TVL,
+/// and lets the user resume only the missing legs later.
+model BasketAttempt {
+    id String @id @default(cuid())
+    bucketId String
+    userId String
+    bucket Bucket @relation(references: [id], fields: [bucketId])
+    user User @relation(references: [id], fields: [userId])
+    direction BasketDirection
+    intendedSol Decimal
+    slippageBps Int
+    status BasketAttemptStatus @default(PENDING)
+    abandonedAt DateTime?
+    feeTransferSignature String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+    legs BasketAttemptLeg[]
+
+    @@index([userId, status])
+    @@index([bucketId])
+}
+
+model BasketAttemptLeg {
+    id String @id @default(cuid())
+    attemptId String
+    attempt BasketAttempt @relation(references: [id], fields: [attemptId], onDelete: Cascade)
+    mint String
+    symbol String?
+    lamports Decimal
+    legIndex Int
+    status BasketLegStatus @default(PENDING)
+    transactionSignature String? @unique
+    lastError String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@index([attemptId])
+    @@index([status])
+}
+
+enum BasketDirection {
+    BUY
+    SELL
+}
+
+enum BasketAttemptStatus {
+    PENDING
+    PARTIAL
+    COMPLETE
+    ABANDONED
+}
+
+enum BasketLegStatus {
+    PENDING
+    SUCCESS
+    FAILED
+    SKIPPED
 }
 
 model Nonce {

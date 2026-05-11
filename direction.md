@@ -14,7 +14,7 @@ We're building:
 **Your version:** User-created buckets, low fee (0.1%), transparent on-chain
 
 “Colosseum Copilot surfaces many Solana ‘index/basket/vault’ hackathon
-  projects; Demutual narrows on creator-issued, versioned mutual-fund-style
+  projects; Demutual narrows on creator-issued, versi oned mutual-fund-style
   portfolios with wallet auth, draft-to-publish fundraising, and transparent
   allocation history.”
 

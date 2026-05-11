@@ -14,6 +14,7 @@ import { useServerConfig } from "../context/ServerConfigContext";
 import {
   fetchBucketById,
   fetchMyPosition,
+  fetchMyDeposits,
   postJupiterInvestComplete,
   postJupiterInvestExecute,
   postJupiterLegOrder,
@@ -23,7 +24,7 @@ import {
   postJupiterSellPlan,
   postTreasuryInvest
 } from "../lib/api";
-import type { ApiBucket, JupiterPlanLeg } from "../lib/types";
+import type { ApiBucket, DepositRow, JupiterInvestPlan, JupiterPlanLeg } from "../lib/types";
 import {
   b64ToUint8Array,
   describeFee,
@@ -38,7 +39,9 @@ import {
   walletSendSolTransfer
 } from "../lib/solanaWallet";
 import { getJupiterSubmitRpcUrl, getSolanaRpcUrl, resolveTreasuryPubkey, setTreasuryInStorage } from "../lib/env";
-import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, CodeXml, Coins } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { researchMarkdownComponents } from "../components/ResearchDocEditor";
 
 const DRAFT_LS = "demutual_draft_bucket_id";
 
@@ -98,8 +101,14 @@ export function BucketDetailPage() {
   const [investSol, setInvestSol] = useState("0.01");
   const [jupiterSol, setJupiterSol] = useState("0.01");
   const [jupiterBuyPlan, setJupiterBuyPlan] = useState<Awaited<ReturnType<typeof postJupiterInvestPlan>> | null>(null);
+  const [jupiterSellPlan, setJupiterSellPlan] = useState<Awaited<ReturnType<typeof postJupiterSellPlan>> | null>(null);
+  const [activePlan, setActivePlan] = useState<null | { kind: "buy" | "sell"; plan: JupiterInvestPlan }>(null);
   const [sellSol, setSellSol] = useState("0.01");
   const [busy, setBusy] = useState<string | null>(null);
+  const [planDialog, setPlanDialog] = useState<null | { kind: "buy" | "sell" }>(null);
+
+  const [myDeposits, setMyDeposits] = useState<DepositRow[]>([]);
+  const [myDepositsErr, setMyDepositsErr] = useState<string | null>(null);
 
   const id = routeId?.trim() ?? "";
 
@@ -121,6 +130,28 @@ export function BucketDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!user || !id) return;
+    let cancelled = false;
+    setMyDepositsErr(null);
+    void (async () => {
+      try {
+        const page = await fetchMyDeposits({ limit: 50, offset: 0 });
+        if (cancelled) return;
+        const rows = (page.data ?? []).filter((d) => d.bucketId === id);
+        rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setMyDeposits(rows);
+      } catch (e) {
+        if (cancelled) return;
+        setMyDeposits([]);
+        setMyDepositsErr(e instanceof Error ? e.message : "Failed to load deposits");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, id]);
 
   useEffect(() => {
     const t = resolveTreasuryPubkey(config?.investTreasuryPubkey ?? null);
@@ -228,6 +259,8 @@ export function BucketDetailPage() {
     try {
       const plan = await postJupiterInvestPlan(bucket.id, { solAmount: amount, slippageBps: 80 });
       setJupiterBuyPlan(plan);
+      setActivePlan({ kind: "buy", plan });
+      setPlanDialog({ kind: "buy" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(hintIfRentError(msg) || errHint(msg) || msg);
@@ -283,6 +316,12 @@ export function BucketDetailPage() {
 
       // Single wallet popup signs ALL legs at once via signAllTransactions.
       setBusy(`Sign ${batch.legs.length} swaps in wallet…`);
+      for (const [i, leg] of batch.legs.entries()) {
+        const tx = leg.swapTransactionBase64?.trim?.() ?? "";
+        if (tx.length < 32) {
+          throw new Error(`JUPITER_BAD_TX_BASE64_LEG_${i + 1}`);
+        }
+      }
       const vtxs = batch.legs.map((b) =>
         VersionedTransaction.deserialize(b64ToUint8Array(b.swapTransactionBase64))
       );
@@ -320,6 +359,7 @@ export function BucketDetailPage() {
         ...(feeTransferSignature ? { feeTransferSignature } : {})
       });
       setJupiterBuyPlan(null);
+      setActivePlan(null);
       await load();
       await loadPosition();
     } catch (e) {
@@ -330,7 +370,7 @@ export function BucketDetailPage() {
     }
   };
 
-  const runJupiterSell = async () => {
+  const buildJupiterSellPlan = async () => {
     if (!bucket || !published || !user) {
       setIsWalletOpen(true);
       return;
@@ -351,17 +391,46 @@ export function BucketDetailPage() {
     setError(null);
     try {
       const plan = await postJupiterSellPlan(bucket.id, { solAmount: amount, slippageBps: 80 });
-      const swaps = plan.legs.filter(
-        (l): l is JupiterPlanLeg & { swapTransactionBase64: string } =>
-          l.kind === "swap" &&
-          typeof l.swapTransactionBase64 === "string" &&
-          l.swapTransactionBase64.length > 0
-      );
-      if (swaps.length === 0) {
-        setError("No sell legs returned.");
-        setBusy(null);
-        return;
-      }
+      setJupiterSellPlan(plan);
+      setActivePlan({ kind: "sell", plan });
+      setPlanDialog({ kind: "sell" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(hintIfRentError(msg) || errHint(msg) || msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const executeJupiterSellPlan = async () => {
+    if (!jupiterSellPlan || !bucket || !published || !user) return;
+    const provider = getConnectedProvider();
+    if (!provider || !walletAddr) {
+      setError("Connect wallet first.");
+      return;
+    }
+    if (!walletMatches) {
+      setError("Connected wallet must match login.");
+      return;
+    }
+    const amount = parseFloat(sellSol);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    const plan = jupiterSellPlan;
+    const swaps = plan.legs.filter(
+      (l): l is JupiterPlanLeg & { swapTransactionBase64: string } =>
+        l.kind === "swap" &&
+        typeof l.swapTransactionBase64 === "string" &&
+        l.swapTransactionBase64.length > 0
+    );
+    if (swaps.length === 0) {
+      setError("No sell legs returned.");
+      return;
+    }
+
+    setBusy(`Sign ${swaps.length} sells in wallet…`);
+    setError(null);
+    try {
       const jupRpc = getJupiterSubmitRpcUrl();
       const connection = new Connection(jupRpc, "confirmed");
 
@@ -373,10 +442,7 @@ export function BucketDetailPage() {
       }
 
       // Single wallet popup signs ALL sell legs at once.
-      setBusy(`Sign ${swaps.length} sells in wallet…`);
-      const vtxs = swaps.map((leg) =>
-        VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
-      );
+      const vtxs = swaps.map((leg) => VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64)));
       const signedB64 = await signAllVersionedTransactionsToBase64(provider, vtxs);
 
       // Send and confirm all in parallel via the configured RPC.
@@ -389,6 +455,8 @@ export function BucketDetailPage() {
         transactionSignatures: sigs,
         ...(feeTransferSignature ? { feeTransferSignature } : {})
       });
+      setJupiterSellPlan(null);
+      setActivePlan(null);
       await load();
       await loadPosition();
     } catch (e) {
@@ -418,35 +486,19 @@ export function BucketDetailPage() {
       onConnectWallet={() => setIsWalletOpen(true)}
       onDisconnect={() => void logout()}
       user={layoutUser}
+      sidebarCollapsed
     >
-      <div className="max-w-3xl mx-auto w-full p-8 pb-16 tracking-tight">
+      <div className="w-full h-full p-6 tracking-tight">
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-[14px] font-semibold text-[#6b7280] hover:text-[#1a1c1e] mb-6"
+          className="flex items-center gap-2 text-[14px] font-semibold text-[#6b7280] hover:text-[#1a1c1e] mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to trending
+          Back
         </button>
 
-        {config && (
-          <div className="mb-6 flex flex-wrap gap-2 text-[12px] font-medium text-[#6b7280]">
-            <span className="px-2 py-1 rounded-lg bg-black/5">Network: {config.network}</span>
-            {config.treasuryInvestEnabled && (
-              <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-800">Treasury invest (devnet)</span>
-            )}
-            {config.jupiterEnabled && (
-              <span className="px-2 py-1 rounded-lg bg-violet-500/10 text-violet-800">Jupiter (mainnet)</span>
-            )}
-          </div>
-        )}
-        {configLoading && <p className="text-[13px] text-[#9ca3af] mb-4">Loading server config…</p>}
-
-        {loading && (
-          <div className="flex items-center gap-2 text-[#6b7280]">
-            <Loader2 className="w-5 h-5 animate-spin" /> Loading bucket…
-          </div>
-        )}
+        {configLoading && <p className="text-[13px] text-[#9ca3af] mb-3">Loading server config…</p>}
 
         {error && (
           <div className="mb-4 flex items-start gap-2 rounded-[12px] border border-red-200/80 bg-red-50/80 px-3 py-2.5 text-[13px] font-medium text-red-800">
@@ -455,290 +507,401 @@ export function BucketDetailPage() {
           </div>
         )}
 
-        {bucket && !loading && (
-          <div
-            className="bg-[#f8f9f7] rounded-3xl p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08),0_12px_24px_-4px_rgba(0,0,0,0.05)]"
-          >
-            <h1 className="text-[24px] font-semibold text-[#1a1c1e] mb-1">{bucket.name}</h1>
-            <p className="text-[13px] text-[#6b7280] font-mono mb-4 break-all">id: {bucket.id}</p>
-            <p className="text-[15px] text-[#374151] mb-2">
-              {bucket.type} · TVL {String(bucket.tvl)} · Est. APY {String(bucket.estimated_apy)}%
-            </p>
+        {loading && (
+          <div className="flex items-center gap-2 text-[#6b7280] mb-4">
+            <Loader2 className="w-5 h-5 animate-spin" /> Loading bucket…
+          </div>
+        )}
 
-            <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
+        {bucket && !loading && (() => {
+          const cardShadow =
+            "shadow-[inset_0_0px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)]";
+          const panelShadow =
+            "shadow-[inset_0_0px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.08),0_10px_20px_-8px_rgba(0,0,0,0.05),0_3px_6px_-2px_rgba(0,0,0,0.04)]";
 
-            <h2 className="text-[15px] font-semibold text-[#374151] mb-3">Allocations</h2>
-            <ul className="space-y-2 text-[14px] text-[#6b7280]">
-              {(bucket.listing ?? []).map((l) => (
-                <li key={l.id} className="flex justify-between gap-4">
-                  <span>{(l.asset as { symbol?: string } | undefined)?.symbol ?? l.assetId.slice(0, 8)}…</span>
-                  <span className="font-medium text-[#1a1c1e]">{String(l.percentage)}%</span>
-                </li>
-              ))}
-            </ul>
+          const listing = bucket.listing ?? [];
+          const plan = planDialog?.kind === "sell" ? jupiterSellPlan : jupiterBuyPlan;
 
-            {user && published && (
-              <>
-                <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
-                <h2 className="text-[15px] font-semibold text-[#374151] mb-3">My position</h2>
-                {!walletMatches && (
-                  <p className="text-[13px] text-amber-800 mb-2">
-                    Wallet mismatch: log in with the connected wallet address or reconnect.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void loadPosition()}
-                  className="mb-3 px-4 py-2 rounded-[10px] bg-white border border-black/10 text-[14px] font-semibold text-[#374151] shadow-sm"
-                >
-                  Refresh position
-                </button>
-                {positionErr && <p className="text-[13px] text-red-700 mb-2">{positionErr}</p>}
-                {position && (
-                  <pre className="text-[12px] bg-white/80 rounded-lg p-3 border border-black/5 overflow-x-auto">
-                    {JSON.stringify(position, null, 2)}
-                  </pre>
-                )}
-              </>
-            )}
+          return (
+            <>
+              {/* Header bar */}
+              <div className={["rounded-[1.25rem]  px-5 py-4 mb-4"].join(" ")}>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="min-w-[220px]">
+                    <div className="flex items-center gap-2 px-2 py-2 bg-[#f8f9f7] rounded-lg shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(255,255,255,0.5),0_0_0_1px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]">
+                      <div className="bg-[#4ade80] p-1.5 rounded-[8px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_2px_4px_rgba(74,222,128,0.3)] shrink-0">
+                        <CodeXml className="w-4 h-4 text-white stroke-[2.5]" />
+                      </div>
+                      <h1 className="text-[18px] font-semibold text-[#1a1c1e] tracking-tight truncate ">{bucket.name}</h1>
+                    </div>
+                  </div>
 
-            {user && published && config?.treasuryInvestEnabled && (
-              <>
-                <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
-                <h2 className="text-[15px] font-semibold text-[#374151] mb-2">Devnet treasury invest</h2>
-                <p className="text-[13px] text-[#6b7280] mb-4">
-                  Gross SOL sent to treasury; server verifies on RPC ({getSolanaRpcUrl()}). Use devnet wallet.
-                </p>
-                <label className="block text-[13px] font-semibold text-[#374151] mb-1">Treasury (base58)</label>
-                <input
-                  value={treasuryInput}
-                  onChange={(e) => {
-                    setTreasuryInput(e.target.value);
-                    if (e.target.value.trim()) setTreasuryInStorage(e.target.value.trim());
-                  }}
-                  className="w-full mb-3 px-3 py-2 rounded-[10px] border border-black/10 bg-white font-mono text-[12px]"
-                  placeholder="Matches server INVEST_TREASURY_PUBKEY"
-                />
-                <label className="block text-[13px] font-semibold text-[#374151] mb-1">SOL amount (gross)</label>
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={investSol}
-                  onChange={(e) => setInvestSol(e.target.value)}
-                  className="w-full max-w-[200px] mb-4 px-3 py-2 rounded-[10px] border border-black/10 bg-white tabular-nums"
-                />
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void onTreasuryInvest()}
-                  className="px-5 py-2.5 rounded-[10px] bg-[#1a1c1e] text-white text-[14px] font-semibold disabled:opacity-50"
-                >
-                  Sign & invest
-                </button>
-              </>
-            )}
-
-            {user && published && config?.jupiterEnabled && (
-              <>
-                <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
-                <h2 className="text-[15px] font-semibold text-[#374151] mb-2">Jupiter basket buy (mainnet)</h2>
-                <p className="text-[13px] text-[#6b7280] mb-4">
-                  Submit txs on {getJupiterSubmitRpcUrl()}. Fee transfer may be required first.
-                </p>
-                <input
-                  type="number"
-                  step="any"
-                  value={jupiterSol}
-                  onChange={(e) => {
-                    setJupiterSol(e.target.value);
-                    setJupiterBuyPlan(null); // Reset plan if input changes
-                  }}
-                  className="w-full max-w-[200px] mb-3 px-3 py-2 rounded-[10px] border border-black/10 bg-white"
-                />
-                
-                {!jupiterBuyPlan ? (
-                  <button
-                    type="button"
-                    disabled={Boolean(busy)}
-                    onClick={() => void buildJupiterBuyPlan()}
-                    className="px-5 py-2.5 rounded-[10px] bg-[#1a1c1e] text-white text-[14px] font-semibold disabled:opacity-50"
-                  >
-                    Build Plan & Preview
-                  </button>
-                ) : (
-                  <div className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50">
-                    <h3 className="text-[14px] font-semibold text-blue-900 mb-3">Plan Preview</h3>
-                    
-                    <div className="space-y-3 mb-4">
-                      {jupiterBuyPlan.legs.map((leg, i) => (
-                        <div key={i} className="text-[13px] flex justify-between">
-                          <span className="text-blue-800 font-medium">
-                            {leg.kind === "swap" ? `Swap for ${leg.symbol}` : `Keep ${leg.symbol}`}
-                          </span>
-                          <span className="text-blue-900">
-                            {leg.kind === "swap"
-                              ? (() => {
-                                  const mint = leg.outputMint || "";
-                                  const row = (bucket?.listing ?? []).find((r) => r.assetId === mint);
-                                  const asset = row?.asset as { decimals?: number } | undefined;
-                                  const decimals = typeof asset?.decimals === "number" ? asset.decimals : mint ? 6 : 6;
-                                  return `~${formatBaseUnits(leg.expectedOutAmount, decimals, 4)}`;
-                                })()
-                              : `${((leg.inputLamports ?? 0) / 10**9).toFixed(4)} SOL`}
-                          </span>
+                  <div className="flex-1 flex items-center pl-8">
+                    <div className="flex items-center gap-12">
+                      {[
+                        { label: "Minimum Price", value: "0.1 SOL", sub: "Minimum Price" },
+                        { label: "Estimated APY", value: `${String(bucket.estimated_apy)}%`, sub: "Estimated APY" },
+                        { label: "TVL", value: String(bucket.tvl), sub: "TVL" },
+                        { label: "Creator", value: bucket.creator?.username || "Unknown", sub: "Creator" }
+                      ].map((s) => (
+                        <div key={s.label} className="flex flex-col">
+                          <div className="text-[12px] font-normal text-[#9ca3af] uppercase tracking-tight mb-0.5">{s.sub}</div>
+                          <div className="text-[15px] font-semibold text-[#1a1c1e] tabular-nums">{s.value}</div>
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              </div>
 
-                    <div className="h-px w-full bg-blue-200/50 my-3" />
-                    
-                    <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                      <span>Max Slippage:</span>
-                      <span>{(((jupiterBuyPlan.slippageBps ?? 0) as number) / 100).toFixed(2)}%</span>
+              {/* Main 3-column section */}
+              <div className="flex gap-4 w-full" style={{ height: "60vh" }}>
+                {/* Left chart area (50%) */}
+                <div className="w-1/2">
+                  <div className={["h-full rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")}>
+                    <div className="h-full rounded-[1rem] border border-black/8 bg-[#f4f4f4] shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] flex items-center justify-center">
+                      <p className="text-[14px] font-semibold text-[#6b7280] tracking-tight">Chart coming soon</p>
                     </div>
-                    
-                    {jupiterBuyPlan.feeTransfer && (
-                      <div className="flex justify-between text-[12px] text-blue-800 mb-4">
-                        <span>Platform/Creator Fee:</span>
-                        <span>
-                          {(() => {
-                            const lamports = jupiterBuyPlan.feeTransfer?.totalLamports ?? 0;
-                            const sol = lamports / 1e9;
-                            if (lamports > 0 && sol < 0.0001) return `${lamports} lamports (${sol.toFixed(9)} SOL)`;
-                            return `${sol.toFixed(4)} SOL`;
-                          })()}
-                        </span>
-                      </div>
-                    )}
+                  </div>
+                </div>
 
-                    {!jupiterBuyPlan.feeTransfer && jupiterBuyPlan.feeTransferSkippedReason && (
-                      <div className="mt-1 mb-3 text-[12px] text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-lg p-2 leading-snug">
-                        Fee transfer skipped: {jupiterBuyPlan.feeTransferSkippedReason}
-                      </div>
-                    )}
+                {/* Middle column (20%) */}
+                <div className="w-[20%] min-w-[260px] flex flex-col gap-4">
+                  {/* Allocation panel */}
+                  <div className={["rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")} style={{ height: "50%" }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight">Allocations</h2>
+                      <span className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider">{listing.length} assets</span>
+                    </div>
+                    <div className="space-y-3 overflow-auto pr-1" style={{ maxHeight: "calc(100% - 28px)" }}>
+                      {listing.length === 0 ? (
+                        <p className="text-[13px] text-[#6b7280]">No assets yet.</p>
+                      ) : (
+                        listing.map((l) => {
+                          const asset = l.asset as { symbol?: string; iconUrl?: string } | undefined;
+                          const pctNum = typeof l.percentage === "number" ? l.percentage : parseFloat(String(l.percentage));
+                          const pct = Number.isFinite(pctNum) ? pctNum : 0;
+                          return (
+                            <div key={l.id} className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-[10px] bg-white border border-black/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center overflow-hidden">
+                                {asset?.iconUrl ? (
+                                  <img src={asset.iconUrl} alt={asset?.symbol ?? "asset"} className="w-5 h-5" />
+                                ) : (
+                                  <Coins className="w-4 h-4 text-[#9ca3af]" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-[13px] font-semibold text-[#1a1c1e] truncate">{asset?.symbol ?? l.assetId.slice(0, 6)}</span>
+                                  <span className="text-[12px] font-semibold text-[#6b7280] tabular-nums">{pct.toFixed(0)}%</span>
+                                </div>
+                                <div className="mt-1 h-2 rounded-full bg-black/5 shadow-[inset_0_1px_1px_rgba(0,0,0,0.06)] overflow-hidden">
+                                  <div className="h-full rounded-full bg-[#1a1c1e]/20" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
 
-                    {(() => {
-                      const swapLamports = jupiterBuyPlan.legs
-                        .filter((l) => l.kind === "swap")
-                        .reduce((acc, l) => acc + (l.inputLamports ?? 0), 0);
-                      const rentLamports = jupiterBuyPlan.investorRequirements?.estimatedRentLamports ?? 0;
-                      const feeLamports = jupiterBuyPlan.feeTransfer?.totalLamports ?? 0;
-                      const networkFeeLamports = 5000 * jupiterBuyPlan.legs.length; // rough per-tx network fee
-                      const totalLamports = swapLamports + rentLamports + feeLamports + networkFeeLamports;
-                      const rentShare = swapLamports > 0 ? rentLamports / swapLamports : 0;
-                      const inefficient = rentShare > 0.3 && rentLamports > 0;
-                      const fmtSol = (lamports: number) => (lamports / 1e9).toFixed(6);
-                      return (
-                        <div className="mt-3 rounded-lg border border-blue-300/70 bg-white/60 p-3">
-                          <div className="text-[12px] font-semibold text-blue-900 mb-2">
-                            Expected wallet debit
+                  {/* Buy / Sell panel */}
+                  <div className={["rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")} style={{ height: "50%" }}>
+                    <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight mb-3">Buy / Sell</h2>
+
+                    {published && config?.jupiterEnabled ? (
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider mb-2">Jupiter Basket Buy (Mainnet)</div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              step="any"
+                              value={jupiterSol}
+                              onChange={(e) => {
+                                setJupiterSol(e.target.value);
+                                setJupiterBuyPlan(null);
+                                if (activePlan?.kind === "buy") setActivePlan(null);
+                              }}
+                              className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
+                            />
+                            {!jupiterBuyPlan ? (
+                              <button
+                                type="button"
+                                disabled={Boolean(busy)}
+                                onClick={() => void buildJupiterBuyPlan()}
+                                className="px-3 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
+                              >
+                                Build
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={Boolean(busy)}
+                                onClick={() => setPlanDialog({ kind: "buy" })}
+                                className="px-3 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
+                              >
+                                Plan
+                              </button>
+                            )}
                           </div>
-                          <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                            <span>Swap input (basket allocation)</span>
-                            <span className="font-mono">{fmtSol(swapLamports)} SOL</span>
-                          </div>
-                          {rentLamports > 0 && (
-                            <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                              <span>
-                                One-time token-account rent
-                                <span className="text-blue-900/60">
-                                  {" "}
-                                  ({jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0} new account
-                                  {(jupiterBuyPlan.investorRequirements?.missingAtas.length ?? 0) === 1 ? "" : "s"})
-                                </span>
-                              </span>
-                              <span className="font-mono">{fmtSol(rentLamports)} SOL</span>
-                            </div>
-                          )}
-                          {feeLamports > 0 && (
-                            <div className="flex justify-between text-[12px] text-blue-800 mb-1">
-                              <span>Platform/creator fee</span>
-                              <span className="font-mono">{fmtSol(feeLamports)} SOL</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-[12px] text-blue-800 mb-2">
-                            <span>Estimated network fees</span>
-                            <span className="font-mono">~{fmtSol(networkFeeLamports)} SOL</span>
-                          </div>
-                          <div className="h-px w-full bg-blue-200/70 mb-2" />
-                          <div className="flex justify-between text-[13px] font-semibold text-blue-900">
-                            <span>Total expected debit</span>
-                            <span className="font-mono">~{fmtSol(totalLamports)} SOL</span>
-                          </div>
-                          {rentLamports > 0 && (
-                            <div className="mt-2 text-[11px] text-blue-900/70 leading-snug">
-                              Token-account rent is locked in your new token accounts and is{" "}
-                              <span className="font-medium">recoverable</span> if you ever close them.
-                              It is paid only the first time you receive each token in this wallet.
-                            </div>
-                          )}
-                          {inefficient && (
-                            <div className="mt-2 text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-2 leading-snug">
-                              Heads up: at this size, one-time rent is{" "}
-                              <span className="font-mono">{(rentShare * 100).toFixed(0)}%</span> of your swap input.
-                              You'll get more token per SOL by using a larger amount, or by reusing this wallet for future
-                              buys (the rent is one-time per token).
-                            </div>
+                          {jupiterBuyPlan && (
+                            <button
+                              type="button"
+                              disabled={Boolean(busy)}
+                              onClick={() => {
+                                setJupiterBuyPlan(null);
+                                if (activePlan?.kind === "buy") setActivePlan(null);
+                              }}
+                              className="mt-2 text-[12px] font-semibold text-[#6b7280] hover:text-[#1a1c1e] underline"
+                            >
+                              Cancel plan
+                            </button>
                           )}
                         </div>
-                      );
-                    })()}
-                    
-                    <div className="flex gap-2">
+
+                        <div className="h-px w-[calc(100%+40px)] -ml-5 my-4 bg-black/5 shadow-[0_1.5px_0_white]" />
+
+                        <div>
+                          <div className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider mb-2">Jupiter Basket Sell</div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              step="any"
+                              value={sellSol}
+                              onChange={(e) => {
+                                setSellSol(e.target.value);
+                                setJupiterSellPlan(null);
+                                if (activePlan?.kind === "sell") setActivePlan(null);
+                              }}
+                              className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
+                            />
+                            {!jupiterSellPlan ? (
+                              <button
+                                type="button"
+                                disabled={Boolean(busy)}
+                                onClick={() => void buildJupiterSellPlan()}
+                                className="px-3 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
+                              >
+                                Build
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={Boolean(busy)}
+                                onClick={() => setPlanDialog({ kind: "sell" })}
+                                className="px-3 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
+                              >
+                                Plan
+                              </button>
+                            )}
+                          </div>
+                          {jupiterSellPlan && (
+                            <button
+                              type="button"
+                              disabled={Boolean(busy)}
+                              onClick={() => {
+                                setJupiterSellPlan(null);
+                                if (activePlan?.kind === "sell") setActivePlan(null);
+                              }}
+                              className="mt-2 text-[12px] font-semibold text-[#6b7280] hover:text-[#1a1c1e] underline"
+                            >
+                              Cancel plan
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[13px] text-[#6b7280]">
+                        {published ? "Jupiter is not enabled on this server." : "Publish the bucket to enable trading."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right column (research docs) */}
+                <div className="flex-1 min-w-[320px]">
+                  <div className={["h-full rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight">Research Docs</h2>
+                      <span className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider">{published ? "Published" : "Draft"}</span>
+                    </div>
+                    <div className="h-[calc(100%-28px)] overflow-auto pr-1">
+                      {published && bucket.researchDoc?.trim() ? (
+                        <div className="rounded-[1rem] border border-black/6 bg-white/70 px-5 py-4">
+                          <ReactMarkdown components={researchMarkdownComponents}>{bucket.researchDoc.trim()}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="rounded-[1rem] border border-black/6 bg-white/50 px-5 py-4 text-[13px] text-[#6b7280]">
+                          Research document not available yet.
+                          {!published && user?.id === bucket.creatorId ? (
+                            <>
+                              {" "}
+                              <button
+                                type="button"
+                                className="underline font-semibold text-[#1a1c1e]"
+                                onClick={() => navigate(`/buckets/${encodeURIComponent(bucket.id)}/research`)}
+                              >
+                                Write research &amp; publish
+                              </button>
+                              .
+                            </>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom section: History (buy/sell activity) */}
+              <div className={["mt-4 rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")}>
+                <div className="flex items-center justify-between gap-4 mb-3">
+                  <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight">My history</h2>
+                  <span className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider">
+                    {user ? "Latest" : "Connect wallet"}
+                  </span>
+                </div>
+
+                {!user ? (
+                  <div className="text-[13px] text-[#6b7280]">Connect wallet to see your buy/sell history.</div>
+                ) : myDepositsErr ? (
+                  <div className="text-[13px] text-[#6b7280]">Could not load history: {myDepositsErr}</div>
+                ) : myDeposits.length === 0 ? (
+                  <div className="text-[13px] text-[#6b7280]">No activity yet.</div>
+                ) : (
+                  <div className="rounded-[1rem] border border-black/8 bg-white/70 overflow-hidden">
+                    <div className="grid grid-cols-[160px_1fr_140px] gap-0 text-[12px] font-semibold uppercase tracking-wider text-[#9ca3af] border-b border-black/8">
+                      <div className="px-4 py-3">Type</div>
+                      <div className="px-4 py-3">When</div>
+                      <div className="px-4 py-3 text-right">Amount</div>
+                    </div>
+                    <div className="max-h-[220px] overflow-auto">
+                      {myDeposits.slice(0, 12).map((d) => (
+                        <div key={d.id} className="grid grid-cols-[160px_1fr_140px] text-[13px] border-b border-black/6 last:border-b-0">
+                          <div className="px-4 py-3 font-semibold text-[#1a1c1e]">Buy</div>
+                          <div className="px-4 py-3 text-[#6b7280] font-medium">
+                            {new Date(d.createdAt).toLocaleString()}
+                          </div>
+                          <div className="px-4 py-3 text-right text-[#1a1c1e] font-semibold tabular-nums">
+                            {String(d.amount)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Plan dialog */}
+              {planDialog && plan && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/20"
+                    onClick={() => setPlanDialog(null)}
+                    aria-label="Close plan dialog"
+                  />
+                  <div
+                    className={[
+                      "relative w-full max-w-2xl rounded-[1.25rem] bg-[#f8f9f7] p-6",
+                      "shadow-[inset_0_2px_1px_rgba(255,255,255,0.85),0_24px_48px_-12px_rgba(0,0,0,0.25),0_0_0_1px_rgba(0,0,0,0.08)]"
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <h3 className="text-[16px] font-semibold text-[#1a1c1e] tracking-tight">
+                          {planDialog.kind === "buy" ? "Buy plan preview" : "Sell plan preview"}
+                        </h3>
+                        <p className="text-[13px] text-[#6b7280] mt-1">
+                          Review legs and confirm execution.
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        disabled={Boolean(busy)}
-                        onClick={() => void executeJupiterBuyPlan()}
-                        className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-[13px] font-semibold disabled:opacity-50"
+                        onClick={() => setPlanDialog(null)}
+                        className="px-3 py-2 rounded-[10px] bg-white border border-black/10 text-[13px] font-semibold text-[#374151] shadow-sm"
                       >
-                        Confirm & Execute Swaps
+                        Close
                       </button>
+                    </div>
+
+                    <div className="rounded-[1.25rem] border border-black/8 bg-[#f8f9f7] p-5 shadow-[inset_0_2px_8px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.9)]">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h4 className="text-[14px] font-semibold text-[#374151] tracking-tight">Plan preview</h4>
+                        <span className="text-[12px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+                          {planDialog.kind === "buy" ? "Jupiter buy" : "Jupiter sell"}
+                        </span>
+                      </div>
+                      <div className="space-y-3 mb-4">
+                        {plan.legs.map((leg, i) => (
+                          <div key={i} className="text-[13px] flex justify-between">
+                            <span className="text-[#374151] font-semibold">
+                              {leg.kind === "swap"
+                                ? planDialog.kind === "sell"
+                                  ? `Sell ${leg.symbol}`
+                                  : `Buy ${leg.symbol}`
+                                : `Keep ${leg.symbol}`}
+                            </span>
+                            <span className="text-[#1a1c1e] font-semibold tabular-nums">
+                              {leg.kind === "swap"
+                                ? (() => {
+                                    const mint = (leg as unknown as { outputMint?: string }).outputMint || "";
+                                    const row = listing.find((r) => r.assetId === mint);
+                                    const asset = row?.asset as { decimals?: number } | undefined;
+                                    const decimals = typeof asset?.decimals === "number" ? asset.decimals : 6;
+                                    const out = (leg as unknown as { expectedOutAmount?: string }).expectedOutAmount;
+                                    return out ? `~${formatBaseUnits(out, decimals, 4)}` : "—";
+                                  })()
+                                : `${(((leg as unknown as { inputLamports?: number }).inputLamports ?? 0) / 1e9).toFixed(4)} SOL`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="h-px w-[calc(100%+40px)] -ml-5 my-4 bg-black/5 shadow-[0_1.5px_0_white]" />
+                      <div className="flex justify-between text-[12px] text-[#6b7280] mb-1 font-semibold">
+                        <span>Max Slippage:</span>
+                        <span className="text-[#1a1c1e] tabular-nums">{(((plan.slippageBps ?? 0) as number) / 100).toFixed(2)}%</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-4">
+                      {planDialog.kind === "buy" ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(busy)}
+                          onClick={() => void executeJupiterBuyPlan()}
+                          className="flex-1 px-4 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
+                        >
+                          Confirm & Execute
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={Boolean(busy)}
+                          onClick={() => void executeJupiterSellPlan()}
+                          className="flex-1 px-4 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
+                        >
+                          Confirm & Execute
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={Boolean(busy)}
-                        onClick={() => setJupiterBuyPlan(null)}
-                        className="px-4 py-2 rounded-lg bg-white border border-blue-200 text-blue-800 text-[13px] font-semibold disabled:opacity-50"
+                        onClick={() => setPlanDialog(null)}
+                        className="px-4 py-2 rounded-[10px] bg-white border border-black/10 text-[#374151] text-[13px] font-semibold shadow-sm disabled:opacity-50"
                       >
                         Cancel
                       </button>
                     </div>
                   </div>
-                )}
-
-                <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
-                <h2 className="text-[15px] font-semibold text-[#374151] mb-2">Jupiter basket sell</h2>
-                <p className="text-[13px] text-[#6b7280] mb-4">Target SOL out; assets come from your wallet.</p>
-                <input
-                  type="number"
-                  step="any"
-                  value={sellSol}
-                  onChange={(e) => setSellSol(e.target.value)}
-                  className="w-full max-w-[200px] mb-3 px-3 py-2 rounded-[10px] border border-black/10 bg-white"
-                />
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void runJupiterSell()}
-                  className="px-5 py-2.5 rounded-[10px] bg-[#374151] text-white text-[14px] font-semibold disabled:opacity-50"
-                >
-                  Sell via Jupiter
-                </button>
-              </>
-            )}
-
-            {!published && user?.id === bucket.creatorId && (
-              <p className="mt-6 text-[14px] text-[#6b7280]">
-                Draft bucket —{" "}
-                <button type="button" className="underline font-semibold" onClick={() => navigate("/create-bucket")}>
-                  continue in create flow
-                </button>
-                . Draft id saved:{" "}
-                <code className="text-[12px]">{typeof localStorage !== "undefined" ? localStorage.getItem(DRAFT_LS) : ""}</code>
-              </p>
-            )}
-          </div>
-        )}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {busy && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 px-4 py-3 rounded-[12px] bg-[#1a1c1e] text-white text-[13px] font-medium shadow-lg flex items-center gap-2">

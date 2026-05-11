@@ -178,6 +178,7 @@ export type UserWhereInput = {
   history?: Prisma.HistoryListRelationFilter
   deposits?: Prisma.DepositListRelationFilter
   withdrawals?: Prisma.WithdrawalListRelationFilter
+  basketAttempts?: Prisma.BasketAttemptListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -189,6 +190,7 @@ export type UserOrderByWithRelationInput = {
   history?: Prisma.HistoryOrderByRelationAggregateInput
   deposits?: Prisma.DepositOrderByRelationAggregateInput
   withdrawals?: Prisma.WithdrawalOrderByRelationAggregateInput
+  basketAttempts?: Prisma.BasketAttemptOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -203,6 +205,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   history?: Prisma.HistoryListRelationFilter
   deposits?: Prisma.DepositListRelationFilter
   withdrawals?: Prisma.WithdrawalListRelationFilter
+  basketAttempts?: Prisma.BasketAttemptListRelationFilter
 }, "id" | "walletAddress">
 
 export type UserOrderByWithAggregationInput = {
@@ -234,6 +237,7 @@ export type UserCreateInput = {
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -245,6 +249,7 @@ export type UserUncheckedCreateInput = {
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -256,6 +261,7 @@ export type UserUpdateInput = {
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -267,6 +273,7 @@ export type UserUncheckedUpdateInput = {
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -380,6 +387,20 @@ export type UserUpdateOneRequiredWithoutBucketsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutBucketsInput, Prisma.UserUpdateWithoutBucketsInput>, Prisma.UserUncheckedUpdateWithoutBucketsInput>
 }
 
+export type UserCreateNestedOneWithoutBasketAttemptsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutBasketAttemptsInput, Prisma.UserUncheckedCreateWithoutBasketAttemptsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutBasketAttemptsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutBasketAttemptsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutBasketAttemptsInput, Prisma.UserUncheckedCreateWithoutBasketAttemptsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutBasketAttemptsInput
+  upsert?: Prisma.UserUpsertWithoutBasketAttemptsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutBasketAttemptsInput, Prisma.UserUpdateWithoutBasketAttemptsInput>, Prisma.UserUncheckedUpdateWithoutBasketAttemptsInput>
+}
+
 export type UserCreateWithoutDepositsInput = {
   id?: string
   username: string
@@ -388,6 +409,7 @@ export type UserCreateWithoutDepositsInput = {
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutDepositsInput = {
@@ -398,6 +420,7 @@ export type UserUncheckedCreateWithoutDepositsInput = {
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutDepositsInput = {
@@ -424,6 +447,7 @@ export type UserUpdateWithoutDepositsInput = {
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutDepositsInput = {
@@ -434,6 +458,7 @@ export type UserUncheckedUpdateWithoutDepositsInput = {
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutWithdrawalsInput = {
@@ -444,6 +469,7 @@ export type UserCreateWithoutWithdrawalsInput = {
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutWithdrawalsInput = {
@@ -454,6 +480,7 @@ export type UserUncheckedCreateWithoutWithdrawalsInput = {
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWithdrawalsInput = {
@@ -480,6 +507,7 @@ export type UserUpdateWithoutWithdrawalsInput = {
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWithdrawalsInput = {
@@ -490,6 +518,7 @@ export type UserUncheckedUpdateWithoutWithdrawalsInput = {
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutHistoryInput = {
@@ -500,6 +529,7 @@ export type UserCreateWithoutHistoryInput = {
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutHistoryInput = {
@@ -510,6 +540,7 @@ export type UserUncheckedCreateWithoutHistoryInput = {
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutHistoryInput = {
@@ -536,6 +567,7 @@ export type UserUpdateWithoutHistoryInput = {
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutHistoryInput = {
@@ -546,6 +578,7 @@ export type UserUncheckedUpdateWithoutHistoryInput = {
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutBucketsInput = {
@@ -556,6 +589,7 @@ export type UserCreateWithoutBucketsInput = {
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutBucketsInput = {
@@ -566,6 +600,7 @@ export type UserUncheckedCreateWithoutBucketsInput = {
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutBucketsInput = {
@@ -592,6 +627,7 @@ export type UserUpdateWithoutBucketsInput = {
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutBucketsInput = {
@@ -599,6 +635,67 @@ export type UserUncheckedUpdateWithoutBucketsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
+  deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
+  withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
+  basketAttempts?: Prisma.BasketAttemptUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutBasketAttemptsInput = {
+  id?: string
+  username: string
+  walletAddress: string
+  createdAt?: Date | string
+  buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
+  history?: Prisma.HistoryCreateNestedManyWithoutUserInput
+  deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
+  withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutBasketAttemptsInput = {
+  id?: string
+  username: string
+  walletAddress: string
+  createdAt?: Date | string
+  buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
+  history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
+  deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
+  withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutBasketAttemptsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutBasketAttemptsInput, Prisma.UserUncheckedCreateWithoutBasketAttemptsInput>
+}
+
+export type UserUpsertWithoutBasketAttemptsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutBasketAttemptsInput, Prisma.UserUncheckedUpdateWithoutBasketAttemptsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutBasketAttemptsInput, Prisma.UserUncheckedCreateWithoutBasketAttemptsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutBasketAttemptsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutBasketAttemptsInput, Prisma.UserUncheckedUpdateWithoutBasketAttemptsInput>
+}
+
+export type UserUpdateWithoutBasketAttemptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
+  history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
+  deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
+  withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutBasketAttemptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
@@ -614,6 +711,7 @@ export type UserCountOutputType = {
   history: number
   deposits: number
   withdrawals: number
+  basketAttempts: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -621,6 +719,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   history?: boolean | UserCountOutputTypeCountHistoryArgs
   deposits?: boolean | UserCountOutputTypeCountDepositsArgs
   withdrawals?: boolean | UserCountOutputTypeCountWithdrawalsArgs
+  basketAttempts?: boolean | UserCountOutputTypeCountBasketAttemptsArgs
 }
 
 /**
@@ -661,6 +760,13 @@ export type UserCountOutputTypeCountWithdrawalsArgs<ExtArgs extends runtime.Type
   where?: Prisma.WithdrawalWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountBasketAttemptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BasketAttemptWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -671,6 +777,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   history?: boolean | Prisma.User$historyArgs<ExtArgs>
   deposits?: boolean | Prisma.User$depositsArgs<ExtArgs>
   withdrawals?: boolean | Prisma.User$withdrawalsArgs<ExtArgs>
+  basketAttempts?: boolean | Prisma.User$basketAttemptsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -701,6 +808,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   history?: boolean | Prisma.User$historyArgs<ExtArgs>
   deposits?: boolean | Prisma.User$depositsArgs<ExtArgs>
   withdrawals?: boolean | Prisma.User$withdrawalsArgs<ExtArgs>
+  basketAttempts?: boolean | Prisma.User$basketAttemptsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -713,6 +821,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     history: Prisma.$HistoryPayload<ExtArgs>[]
     deposits: Prisma.$DepositPayload<ExtArgs>[]
     withdrawals: Prisma.$WithdrawalPayload<ExtArgs>[]
+    basketAttempts: Prisma.$BasketAttemptPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1117,6 +1226,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   history<T extends Prisma.User$historyArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$historyArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   deposits<T extends Prisma.User$depositsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$depositsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DepositPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   withdrawals<T extends Prisma.User$withdrawalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$withdrawalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WithdrawalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  basketAttempts<T extends Prisma.User$basketAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$basketAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BasketAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1636,6 +1746,30 @@ export type User$withdrawalsArgs<ExtArgs extends runtime.Types.Extensions.Intern
   take?: number
   skip?: number
   distinct?: Prisma.WithdrawalScalarFieldEnum | Prisma.WithdrawalScalarFieldEnum[]
+}
+
+/**
+ * User.basketAttempts
+ */
+export type User$basketAttemptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BasketAttempt
+   */
+  select?: Prisma.BasketAttemptSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BasketAttempt
+   */
+  omit?: Prisma.BasketAttemptOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BasketAttemptInclude<ExtArgs> | null
+  where?: Prisma.BasketAttemptWhereInput
+  orderBy?: Prisma.BasketAttemptOrderByWithRelationInput | Prisma.BasketAttemptOrderByWithRelationInput[]
+  cursor?: Prisma.BasketAttemptWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BasketAttemptScalarFieldEnum | Prisma.BasketAttemptScalarFieldEnum[]
 }
 
 /**

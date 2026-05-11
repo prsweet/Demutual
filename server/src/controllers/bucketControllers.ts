@@ -13,6 +13,7 @@ import {
   listBucketsQuerySchema,
   response,
   type decoratedContext,
+  type publishBucketSchema,
   type withdrawBucketSchema
 } from "../types";
 
@@ -325,8 +326,9 @@ const addBucketAssets = async ({
 
 const publishBucket = async ({
   params,
-  userId
-}: decoratedContext<Context<{ params: { id: string } }>>) => {
+  userId,
+  body
+}: decoratedContext<Context<{ params: { id: string }; body: publishBucketSchema }>>) => {
   try {
     if (!userId) return status(401, response(false, null, errors.unauthorized401));
 
@@ -345,9 +347,14 @@ const publishBucket = async ({
       return status(400, response(false, null, errors.bucketNoAssets400));
     }
 
+    const doc = body.researchDoc.trim();
+    if (doc.length < 100) {
+      return status(400, response(false, null, errors.researchDocTooShort400));
+    }
+
     const published = await prisma.bucket.update({
       where: { id: params.id },
-      data: { type: "PUBLISHED" },
+      data: { type: "PUBLISHED", researchDoc: doc },
       include: {
         listing: { include: { asset: true } },
         creator: { select: { id: true, username: true, walletAddress: true } },
