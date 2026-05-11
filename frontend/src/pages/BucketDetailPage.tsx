@@ -737,33 +737,39 @@ export function BucketDetailPage() {
       return;
     }
     const plan = jupiterSellPlan;
-    const swaps = plan.legs
-      .filter(
-        (l): l is JupiterPlanLeg & { swapTransactionBase64: string; legId: string } =>
-          l.kind === "swap" &&
-          typeof l.swapTransactionBase64 === "string" &&
-          l.swapTransactionBase64.length > 0 &&
-          typeof l.legId === "string" &&
-          l.legId.length > 0
-      )
-      .map((l) => ({
-        legId: l.legId,
-        symbol: l.symbol ?? null,
-        swapTransactionBase64: l.swapTransactionBase64,
-        requestId: l.requestId
-      }));
-
-    if (swaps.length === 0) {
+    // Diagnose each swap leg — record exactly which field is missing so we surface a precise error.
+    const swapLegs = plan.legs.filter((l) => l.kind === "swap");
+    const missingDetails: string[] = [];
+    swapLegs.forEach((l, idx) => {
+      const sym = l.symbol ?? `leg${idx}`;
+      const has = (v: unknown) => typeof v === "string" && v.length > 0;
+      const missing: string[] = [];
+      if (!has(l.swapTransactionBase64)) missing.push("swapTransactionBase64");
+      if (!has(l.legId)) missing.push("legId");
+      if (!has(l.requestId)) missing.push("requestId");
+      if (missing.length > 0) {
+        missingDetails.push(`${sym} missing [${missing.join(", ")}]`);
+      }
+    });
+    if (missingDetails.length > 0) {
+      console.error("[executeJupiterSellPlan] incomplete legs", { plan, missingDetails });
       setError(
-        `Sell plan has no valid swap legs (plan.legs.length=${plan.legs.length}). Rebuild the plan.`
+        `Sell plan returned ${swapLegs.length} swap leg(s) but some are missing required fields → ${missingDetails.join("; ")}. Rebuild the plan, and check the browser console for the full server response.`
       );
       setBusy(null);
       return;
     }
-    const missingRequestIds = swaps.filter((s) => !s.requestId).length;
-    if (missingRequestIds > 0) {
+
+    const swaps = swapLegs.map((l) => ({
+      legId: l.legId!,
+      symbol: l.symbol ?? null,
+      swapTransactionBase64: l.swapTransactionBase64!,
+      requestId: l.requestId!
+    }));
+
+    if (swaps.length === 0) {
       setError(
-        `${missingRequestIds} sell leg(s) missing a Jupiter requestId — server response was incomplete. Rebuild the plan.`
+        `Sell plan has no swap legs at all (plan.legs.length=${plan.legs.length}, all noops?). Rebuild the plan.`
       );
       setBusy(null);
       return;
