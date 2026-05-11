@@ -979,6 +979,29 @@ export function BucketDetailPage() {
   const minSwapSol = bucket?.limits ? lamportsToSol(bucket.limits.minSwapLamports) : 0;
   const minSwapUsd = solToUsd(minSwapSol, solUsd);
 
+  /**
+   * Weighted 24h price change across the basket. Real, live number — refreshes whenever
+   * `usePrices` polls. Honest framing: this is *today*'s % move, NOT annualized APY.
+   * If <95% of the weight is covered by known priceChange24h values, return null so we
+   * don't show a misleading partial average.
+   */
+  const todayPctChange: number | null = (() => {
+    const listings = bucket?.listing ?? [];
+    if (listings.length === 0) return null;
+    let total = 0;
+    let coveredPct = 0;
+    for (const l of listings) {
+      const pct = Number(l.percentage);
+      if (!Number.isFinite(pct) || pct <= 0) continue;
+      const change = priceMap[l.assetId]?.priceChange24h;
+      if (typeof change !== "number" || !Number.isFinite(change)) continue;
+      total += (pct * change) / 100;
+      coveredPct += pct;
+    }
+    if (coveredPct < 95) return null;
+    return total;
+  })();
+
   // Slippage UI guards
   const slippageRecommended = slippageBps === slippageRecommendation.bps;
   const slippageTooLow = slippageBps < 10;
@@ -1112,9 +1135,9 @@ export function BucketDetailPage() {
             <>
               {/* Header bar */}
               <div className="rounded-[1.25rem] px-5 py-4 mb-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="min-w-[220px]">
-                    <div className="flex items-center gap-2 px-2 py-2 bg-[#f8f9f7] rounded-lg shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(255,255,255,0.5),0_0_0_1px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]">
+                <div className="flex flex-wrap items-stretch gap-4">
+                  <div className="min-w-[220px] flex">
+                    <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-[#f8f9f7] rounded-lg shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(255,255,255,0.5),0_0_0_1px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]">
                       <div className="bg-[#4ade80] p-1.5 rounded-[8px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_2px_4px_rgba(74,222,128,0.3)] shrink-0">
                         <CodeXml className="w-4 h-4 text-white stroke-[2.5]" />
                       </div>
@@ -1139,16 +1162,26 @@ export function BucketDetailPage() {
                       </div>
                       <div className="flex flex-col">
                         <div className="text-[12px] font-normal text-[#9ca3af] uppercase tracking-tight mb-0.5">
-                          Current APY
+                          Today
                         </div>
                         <div
-                          className="text-[15px] font-semibold text-[#1a1c1e] tabular-nums"
-                          title="Real-time current APY integration pending — value shown is a placeholder."
+                          className={`text-[15px] font-semibold tabular-nums ${
+                            todayPctChange === null
+                              ? "text-[#1a1c1e]"
+                              : todayPctChange > 0
+                                ? "text-emerald-600"
+                                : todayPctChange < 0
+                                  ? "text-red-600"
+                                  : "text-[#6b7280]"
+                          }`}
+                          title="Weighted 24h price change across this basket — refreshes with Jupiter price data. Not annualized."
                         >
-                          —
+                          {todayPctChange === null
+                            ? "—"
+                            : `${todayPctChange > 0 ? "+" : ""}${todayPctChange.toFixed(2)}%`}
                         </div>
                         <div className="text-[10px] text-[#9ca3af] font-mono">
-                          est. {String(bucket.estimated_apy)}%
+                          est. {String(bucket.estimated_apy)}% APY
                         </div>
                       </div>
                       <div className="flex flex-col">
@@ -1196,11 +1229,6 @@ export function BucketDetailPage() {
                     </div>
                   </div>
                 </div>
-                {asOfLine && solUsd !== null && (
-                  <p className="text-[10px] text-[#9ca3af] mt-2 pl-1">
-                    USD figures {asOfLine} — actual fills depend on slippage at execution.
-                  </p>
-                )}
               </div>
 
               {/* Resumable attempts (PENDING/PARTIAL for this bucket) */}

@@ -172,7 +172,10 @@ export async function fetchMyPosition(bucketId: string): Promise<MyPosition> {
 }
 
 export type PricesPayload = {
-  prices: Record<string, { price: number | null; confidence: string | null }>;
+  prices: Record<
+    string,
+    { price: number | null; confidence: string | null; priceChange24h: number | null }
+  >;
   /** Oldest cache asOf among requested mints — drives the "as of HH:MM:SS" footnote. */
   asOf: number;
   staleMints: string[];

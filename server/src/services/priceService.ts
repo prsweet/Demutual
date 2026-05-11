@@ -17,13 +17,18 @@ type CacheEntry = {
   price: number | null;
   /** Jupiter price v3 doesn't always return a confidence field; null when absent. */
   confidence: string | null;
+  /** Percent change over 24h from Jupiter (e.g. 1.39 = +1.39%). Null if Jupiter doesn't return it. */
+  priceChange24h: number | null;
   asOf: number;
 };
 
 const cache = new Map<string, CacheEntry>();
 
 export type PriceResult = {
-  prices: Record<string, { price: number | null; confidence: string | null }>;
+  prices: Record<
+    string,
+    { price: number | null; confidence: string | null; priceChange24h: number | null }
+  >;
   /** Oldest cache asOf among requested mints — drives the "as of" footnote. */
   asOf: number;
   /** Mints we could not refresh (returned cached or null). */
@@ -58,13 +63,15 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
         const res = await fetch(u.toString(), { headers });
         if (!res.ok) {
           for (const m of chunk) {
-            if (!cache.has(m)) cache.set(m, { price: null, confidence: null, asOf: now });
+            if (!cache.has(m)) {
+              cache.set(m, { price: null, confidence: null, priceChange24h: null, asOf: now });
+            }
           }
           continue;
         }
         const body = (await res.json()) as Record<
           string,
-          { usdPrice?: number; confidenceLevel?: string } | undefined
+          { usdPrice?: number; confidenceLevel?: string; priceChange24h?: number } | undefined
         >;
         for (const m of chunk) {
           const row = body?.[m];
@@ -72,16 +79,23 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
             row && typeof row.usdPrice === "number" && Number.isFinite(row.usdPrice)
               ? row.usdPrice
               : null;
+          const pc =
+            row && typeof row.priceChange24h === "number" && Number.isFinite(row.priceChange24h)
+              ? row.priceChange24h
+              : null;
           cache.set(m, {
             price,
             confidence: row?.confidenceLevel ?? null,
+            priceChange24h: pc,
             asOf: now
           });
         }
       } catch (e) {
         console.warn("[priceService chunk]", e);
         for (const m of chunk) {
-          if (!cache.has(m)) cache.set(m, { price: null, confidence: null, asOf: now });
+          if (!cache.has(m)) {
+            cache.set(m, { price: null, confidence: null, priceChange24h: null, asOf: now });
+          }
         }
       }
     }
@@ -93,11 +107,15 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
   for (const mint of mints) {
     const c = cache.get(mint);
     if (!c) {
-      prices[mint] = { price: null, confidence: null };
+      prices[mint] = { price: null, confidence: null, priceChange24h: null };
       staleMints.push(mint);
       continue;
     }
-    prices[mint] = { price: c.price, confidence: c.confidence };
+    prices[mint] = {
+      price: c.price,
+      confidence: c.confidence,
+      priceChange24h: c.priceChange24h
+    };
     if (c.asOf < oldestAsOf) oldestAsOf = c.asOf;
     if (now - c.asOf > PRICE_TTL_MS) staleMints.push(mint);
   }
