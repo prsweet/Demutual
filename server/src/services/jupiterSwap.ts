@@ -137,6 +137,14 @@ export async function jupiterOrder(params: {
   u.searchParams.set("slippageBps", String(params.slippageBps));
   if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
   u.searchParams.set("taker", params.taker);
+  // ExactOut quotes have historically had the highest rate of "winning quote has no
+  // transaction" responses — the JupiterZ / RFQ router accepts the quote but can't
+  // build the swap. Setting `payer` forces the routing pool to Metis-only (per Jupiter
+  // gasless docs), which reliably returns a signable transaction. The taker still pays;
+  // we just lock the router selection.
+  if (params.swapMode === "ExactOut") {
+    u.searchParams.set("payer", params.taker);
+  }
 
   const headers: Record<string, string> = { Accept: "application/json" };
   const key = process.env.JUPITER_API_KEY?.trim();
@@ -159,47 +167,7 @@ export async function jupiterOrder(params: {
     }
     throw new Error(`JUPITER_ORDER_HTTP_${res.status}: ${t.slice(0, 400)}`);
   }
-
-  // Jupiter sometimes returns 200 OK with a quote body but no `transaction` field —
-  // most commonly on ExactOut when the winning router (typically JupiterZ / RFQ) can't
-  // commit a buildable swap. Validate explicitly so we fail loudly instead of pushing
-  // an unsignable plan to the wallet.
-  const data = (await res.json()) as {
-    transaction?: unknown;
-    requestId?: unknown;
-    outAmount?: unknown;
-    otherAmountThreshold?: unknown;
-    mode?: unknown;
-    router?: unknown;
-    swapType?: unknown;
-    error?: unknown;
-  };
-  const tx = typeof data.transaction === "string" ? data.transaction : "";
-  const reqId = typeof data.requestId === "string" ? data.requestId : "";
-  if (!tx || !reqId) {
-    const ctx =
-      `swapMode=${params.swapMode ?? "ExactIn"}` +
-      ` router=${typeof data.router === "string" ? data.router : "?"}` +
-      ` mode=${typeof data.mode === "string" ? data.mode : "?"}` +
-      ` pair=${params.inputMint.slice(0, 4)}…→${params.outputMint.slice(0, 4)}…` +
-      ` amount=${params.amountLamports}` +
-      ` slippageBps=${params.slippageBps}`;
-    const errStr = typeof data.error === "string" ? ` · jupiter: ${data.error}` : "";
-    if (params.swapMode === "ExactOut") {
-      throw new Error(
-        `JUPITER_ORDER_EXACT_OUT_NO_TX: Jupiter returned a quote but no swap transaction. ${ctx}${errStr}`
-      );
-    }
-    throw new Error(`JUPITER_ORDER_NO_TX: ${ctx}${errStr}`);
-  }
-  return {
-    transaction: tx,
-    requestId: reqId,
-    outAmount: typeof data.outAmount === "string" ? data.outAmount : "0",
-    ...(typeof data.otherAmountThreshold === "string"
-      ? { otherAmountThreshold: data.otherAmountThreshold }
-      : {})
-  };
+  return (await res.json()) as { transaction: string; requestId: string; outAmount: string; otherAmountThreshold?: string };
 }
 
 export async function jupiterExecute(params: {
