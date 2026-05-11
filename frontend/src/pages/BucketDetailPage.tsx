@@ -61,8 +61,10 @@ import { useTokenInfo } from "../lib/useTokenInfo";
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   CodeXml,
   Coins,
+  Copy,
   Loader2,
   ShieldAlert,
   ShieldCheck
@@ -157,6 +159,19 @@ export function BucketDetailPage() {
   const [planDialog, setPlanDialog] = useState<null | { kind: "buy" | "sell" }>(null);
   /** Tabbed buy/sell panel — only one side visible at a time so the panel stays compact. */
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
+  /** Ephemeral "copied" feedback for the creator-wallet copy button. */
+  const [copiedCreator, setCopiedCreator] = useState(false);
+  const copyCreatorWallet = async () => {
+    const addr = bucket?.creator?.walletAddress;
+    if (!addr) return;
+    try {
+      await navigator.clipboard.writeText(addr);
+      setCopiedCreator(true);
+      window.setTimeout(() => setCopiedCreator(false), 1500);
+    } catch {
+      // Clipboard API can throw on insecure contexts — fall back silently.
+    }
+  };
 
   const [myDeposits, setMyDeposits] = useState<DepositRow[]>([]);
   const [myDepositsErr, setMyDepositsErr] = useState<string | null>(null);
@@ -371,7 +386,7 @@ export function BucketDetailPage() {
       throw new Error("Wallet disconnected — connect and retry.");
     }
 
-    setBusy(`Sign ${params.legs.length} swap${params.legs.length === 1 ? "" : "s"} in wallet…`);
+    setBusy(`Sign ${params.legs.length} swap${params.legs.length === 1 ? "" : "s"} in wallet (single popup)…`);
     const vtxs = params.legs.map((b) =>
       VersionedTransaction.deserialize(b64ToUint8Array(b.swapTransactionBase64))
     );
@@ -476,14 +491,18 @@ export function BucketDetailPage() {
       }
       const jupRpc = getJupiterSubmitRpcUrl();
       const connection = new Connection(jupRpc, "confirmed");
+      const hasFee = !!(plan.feeTransfer && plan.feeTransfer.splits.length > 0);
+      const totalSteps = hasFee ? 2 : 1;
+      let stepN = 1;
       let feeTransferSignature: string | undefined;
-      if (plan.feeTransfer && plan.feeTransfer.splits.length > 0) {
-        setBusy(`Fee: ${describeFee(plan.feeTransfer)} — sign in wallet…`);
+      if (hasFee && plan.feeTransfer) {
+        setBusy(`Step ${stepN}/${totalSteps} · sign fee (${describeFee(plan.feeTransfer)}) in wallet…`);
         feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
+        stepN += 1;
       }
       const slip = plan.slippageBps ?? slippageBps;
 
-      setBusy(`Building ${swaps.length} fresh swap orders…`);
+      setBusy(`Step ${stepN}/${totalSteps} · building ${swaps.length} fresh swap orders…`);
       const batch = await postJupiterLegOrdersBatch(bucket.id, {
         legs: swaps.map((s) => ({ outputMint: s.outputMint, lamports: s.inputLamports })),
         slippageBps: slip,
@@ -598,7 +617,7 @@ export function BucketDetailPage() {
       throw new Error("Wallet disconnected — connect and retry.");
     }
 
-    setBusy(`Sign ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} in wallet…`);
+    setBusy(`Sign ${params.legs.length} sell${params.legs.length === 1 ? "" : "s"} in wallet (single popup)…`);
     const vtxs = params.legs.map((leg) =>
       VersionedTransaction.deserialize(b64ToUint8Array(leg.swapTransactionBase64))
     );
@@ -718,11 +737,12 @@ export function BucketDetailPage() {
     setError(null);
     setPartialResult(null);
     try {
+      const hasFee = !!(plan.feeTransfer && plan.feeTransfer.splits.length > 0);
       let feeTransferSignature: string | undefined;
-      if (plan.feeTransfer && plan.feeTransfer.splits.length > 0) {
+      if (hasFee && plan.feeTransfer) {
         const jupRpc = getJupiterSubmitRpcUrl();
         const connection = new Connection(jupRpc, "confirmed");
-        setBusy(`Fee: ${describeFee(plan.feeTransfer)} — sign in wallet…`);
+        setBusy(`Step 1/2 · sign fee (${describeFee(plan.feeTransfer)}) in wallet…`);
         feeTransferSignature = await signFeeTransfer(provider, connection, walletAddr, plan.feeTransfer);
       }
 
@@ -1021,11 +1041,26 @@ export function BucketDetailPage() {
                           {bucket.creator?.username || "Unknown"}
                         </div>
                         {bucket.creator?.walletAddress && (
-                          <div
-                            className="text-[10px] text-[#9ca3af] font-mono"
-                            title={bucket.creator.walletAddress}
-                          >
-                            {shortenAddress(bucket.creator.walletAddress, 4)}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span
+                              className="text-[10px] text-[#9ca3af] font-mono"
+                              title={bucket.creator.walletAddress}
+                            >
+                              {shortenAddress(bucket.creator.walletAddress, 4)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void copyCreatorWallet()}
+                              aria-label={copiedCreator ? "Wallet address copied" : "Copy creator wallet address"}
+                              title={copiedCreator ? "Copied!" : "Copy full address"}
+                              className="inline-flex items-center justify-center w-5 h-5 rounded text-[#9ca3af] hover:text-[#374151] hover:bg-black/[0.04] transition-colors"
+                            >
+                              {copiedCreator ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1660,6 +1695,19 @@ export function BucketDetailPage() {
                         </div>
                       )}
                     </div>
+
+                    {plan.feeTransfer && plan.feeTransfer.splits.length > 0 && (
+                      <div className="mt-3 rounded-[10px] border border-black/8 bg-white/70 px-3 py-2.5 text-[11px] text-[#374151] leading-snug">
+                        <div className="font-semibold text-[#1a1c1e] mb-0.5">What happens next</div>
+                        <ol className="list-decimal list-inside space-y-0.5 text-[#6b7280]">
+                          <li>Your wallet shows a small SOL transfer (≈ {formatUsd(solToUsd((plan.feeTransfer.totalLamports ?? 0) / 1e9, solUsd))}) — that's the platform / creator fee.</li>
+                          <li>A second popup shows all {plan.legs.filter((l) => l.kind === "swap").length} swap{plan.legs.filter((l) => l.kind === "swap").length === 1 ? "" : "s"} in one signature.</li>
+                        </ol>
+                        <p className="text-[#9ca3af] mt-1">
+                          Your wallet may flash a "simulation failed" or "balance changes not detected" warning between the two — that's normal for multi-step basket signs and not a danger sign.
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 mt-4">
                       {planDialog.kind === "buy" ? (
