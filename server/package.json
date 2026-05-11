@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "devDependencies": {
@@ -11,9 +11,12 @@
   },
   "scripts": {
     "dev": "bun --hot src/index.ts",
+    "build": "bunx --bun prisma generate",
+    "start": "bun src/index.ts",
     "test": "bun test",
     "db:generate": "bunx --bun prisma generate",
-    "db:push": "bunx --bun prisma db push"
+    "db:push": "bunx --bun prisma db push",
+    "db:migrate:deploy": "bunx --bun prisma migrate deploy"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",

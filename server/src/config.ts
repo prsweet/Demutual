@@ -19,6 +19,7 @@ export function serverPort(): number {
 /** CORS: comma-separated exact origins, or default localhost regexes. */
 export function corsOrigins(): (string | RegExp)[] {
   const raw = process.env.CORS_ORIGINS?.trim();
+  if (raw === "*") return [/.*/];
   if (raw) {
     return raw
       .split(",")
