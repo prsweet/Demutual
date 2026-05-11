@@ -55,7 +55,9 @@ import {
 import { displayTokenName, displayTokenSymbol } from "../lib/tokenLabels";
 import { SOL_MINT, usePrices } from "../lib/usePrices";
 import { useTokenInfo } from "../lib/useTokenInfo";
-import { ArrowLeft, Loader2, AlertCircle, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, ShieldCheck, ShieldAlert, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { researchMarkdownComponents } from "../components/ResearchDocEditor";
 
 const DRAFT_LS = "demutual_draft_bucket_id";
 
@@ -185,6 +187,9 @@ export function BucketDetailPage() {
   const [slippageBps, setSlippageBps] = useState<number>(slippageRecommendation.bps);
   const [slippageInput, setSlippageInput] = useState<string>(bpsToPercentString(slippageRecommendation.bps));
   const [slippageEdited, setSlippageEdited] = useState<boolean>(false);
+
+  /** Research doc collapse state — default open so investors can read it before they invest. */
+  const [researchOpen, setResearchOpen] = useState(true);
   useEffect(() => {
     if (slippageEdited) return;
     setSlippageBps(slippageRecommendation.bps);
@@ -1056,6 +1061,40 @@ export function BucketDetailPage() {
                     Don't resume
                   </button>
                 </div>
+              </div>
+            )}
+
+            {bucket.researchDoc && bucket.researchDoc.trim().length > 0 && (
+              <div className="mb-6 rounded-[14px] border border-black/8 bg-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <button
+                  type="button"
+                  onClick={() => setResearchOpen((v) => !v)}
+                  aria-expanded={researchOpen}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-black/[0.02] transition-colors rounded-t-[14px]"
+                >
+                  <span className="flex items-center gap-2 text-[14px] font-semibold text-[#1a1c1e]">
+                    <FileText className="w-4 h-4 text-[#6b7280]" />
+                    Creator's research document
+                  </span>
+                  <span className="flex items-center gap-2 text-[12px] font-medium text-[#9ca3af]">
+                    {researchOpen ? "Hide" : "Show"}
+                    {researchOpen ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </span>
+                </button>
+                {researchOpen && (
+                  <div className="px-5 pb-5 pt-1 border-t border-black/5 text-[#374151] text-[14px] leading-relaxed">
+                    <ReactMarkdown components={researchMarkdownComponents}>
+                      {bucket.researchDoc}
+                    </ReactMarkdown>
+                    <p className="text-[11px] text-[#9ca3af] mt-4 pt-3 border-t border-black/5">
+                      Written by the bucket creator before publishing. Locked once published — investors can trust they're reading exactly what was in front of earlier buyers.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
