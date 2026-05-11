@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router";
 import { CodeXml, Coins } from "lucide-react";
+import { formatUsd } from "../lib/money";
 
 export interface BucketCardProps {
   id: string;
@@ -10,6 +11,10 @@ export interface BucketCardProps {
   creatorName?: string;
   assetsCount?: number;
   icon?: React.ReactNode;
+  /** Min basket size in SOL, resolved from the bucket's per-leg minimum. */
+  minBasketSol?: number;
+  /** Pre-computed USD equivalent of `minBasketSol` (Dashboard runs `usePrices` once for the whole grid). */
+  minBasketUsd?: number | null;
 }
 
 export function BucketCard({
@@ -19,7 +24,9 @@ export function BucketCard({
   apy,
   creatorName,
   assetsCount = 0,
-  icon
+  icon,
+  minBasketSol,
+  minBasketUsd
 }: BucketCardProps) {
   const navigate = useNavigate();
   const open = () => navigate(`/buckets/${encodeURIComponent(id)}`);
@@ -53,10 +60,17 @@ export function BucketCard({
 
       {/* Main Stats */}
       <div className="flex flex-col mb-4 tracking-tight">
-        <div className="flex items-baseline gap-2 mb-1.5">
-          <span className="text-[32px] font-medium text-[#1a1c1e] leading-none">0.01 SOL</span>
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="text-[32px] font-medium text-[#1a1c1e] leading-none">
+            {minBasketUsd !== null && minBasketUsd !== undefined ? formatUsd(minBasketUsd) : "—"}
+          </span>
           <span className="text-[14px] text-[#9ca3af] font-normal">(min)</span>
         </div>
+        {typeof minBasketSol === "number" && minBasketSol > 0 && (
+          <div className="text-[12px] text-[#9ca3af] font-mono mb-1.5">
+            {minBasketSol.toFixed(4)} SOL
+          </div>
+        )}
         <div className="text-[14px] font-medium text-[#47cb77] flex items-center gap-1">
           ▲ +{apy}
         </div>

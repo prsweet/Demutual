@@ -9,7 +9,6 @@ import {
 } from "@solana/web3.js";
 import { Layout } from "../components/Layout";
 import { ConnectWalletModal } from "../components/ConnectWalletModal";
-import { CreatorVerificationStatus } from "../components/CreatorVerificationStatus";
 import { useAuth } from "../context/AuthContext";
 import { useServerConfig } from "../context/ServerConfigContext";
 import {
@@ -37,6 +36,7 @@ import {
   describeFee,
   getConnectedAddress,
   getConnectedProvider,
+  shortenAddress,
   signAllVersionedTransactionsToBase64,
   signFeeTransfer,
   solToLamports,
@@ -46,7 +46,6 @@ import {
   getJupiterSubmitRpcUrl,
   getSolanaRpcUrl,
   resolveTreasuryPubkey,
-  rpcDisplayHost,
   setTreasuryInStorage
 } from "../lib/env";
 import { formatAsOf, formatSol, formatUsd, lamportsToSol, solToUsd } from "../lib/money";
@@ -156,6 +155,8 @@ export function BucketDetailPage() {
   const [jupiterSellPlan, setJupiterSellPlan] = useState<Awaited<ReturnType<typeof postJupiterSellPlan>> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [planDialog, setPlanDialog] = useState<null | { kind: "buy" | "sell" }>(null);
+  /** Tabbed buy/sell panel — only one side visible at a time so the panel stays compact. */
+  const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
 
   const [myDeposits, setMyDeposits] = useState<DepositRow[]>([]);
   const [myDepositsErr, setMyDepositsErr] = useState<string | null>(null);
@@ -972,9 +973,6 @@ export function BucketDetailPage() {
                         {bucket.name}
                       </h1>
                     </div>
-                    <p className="text-[11px] text-[#9ca3af] font-mono mt-1 break-all">
-                      {bucket.type} · id {bucket.id.slice(0, 8)}…
-                    </p>
                   </div>
 
                   <div className="flex-1 flex items-center pl-8">
@@ -992,10 +990,16 @@ export function BucketDetailPage() {
                       </div>
                       <div className="flex flex-col">
                         <div className="text-[12px] font-normal text-[#9ca3af] uppercase tracking-tight mb-0.5">
-                          Estimated APY
+                          Current APY
                         </div>
-                        <div className="text-[15px] font-semibold text-[#1a1c1e] tabular-nums">
-                          {String(bucket.estimated_apy)}%
+                        <div
+                          className="text-[15px] font-semibold text-[#1a1c1e] tabular-nums"
+                          title="Real-time current APY integration pending — value shown is a placeholder."
+                        >
+                          —
+                        </div>
+                        <div className="text-[10px] text-[#9ca3af] font-mono">
+                          est. {String(bucket.estimated_apy)}%
                         </div>
                       </div>
                       <div className="flex flex-col">
@@ -1016,6 +1020,14 @@ export function BucketDetailPage() {
                         <div className="text-[15px] font-semibold text-[#1a1c1e]">
                           {bucket.creator?.username || "Unknown"}
                         </div>
+                        {bucket.creator?.walletAddress && (
+                          <div
+                            className="text-[10px] text-[#9ca3af] font-mono"
+                            title={bucket.creator.walletAddress}
+                          >
+                            {shortenAddress(bucket.creator.walletAddress, 4)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1026,13 +1038,6 @@ export function BucketDetailPage() {
                   </p>
                 )}
               </div>
-
-              {/* Creator-side notice (only renders when viewing your own bucket and unverified) */}
-              {user?.id === bucket.creatorId && (
-                <div className="mb-4">
-                  <CreatorVerificationStatus variant="banner" />
-                </div>
-              )}
 
               {/* Resumable attempts (PENDING/PARTIAL for this bucket) */}
               {user && resumableAttempts.length > 0 && (
@@ -1273,9 +1278,35 @@ export function BucketDetailPage() {
                     </div>
                   </div>
 
-                  {/* Buy / Sell panel */}
+                  {/* Buy / Sell panel — tabbed so only one side renders at a time */}
                   <div className={["rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")}>
-                    <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight mb-3">Buy / Sell</h2>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight">Trade</h2>
+                      <div className="inline-flex rounded-[10px] bg-white border border-black/10 p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
+                        <button
+                          type="button"
+                          onClick={() => setTradeMode("buy")}
+                          className={`px-3 py-1 rounded-[8px] text-[12px] font-semibold transition-colors ${
+                            tradeMode === "buy"
+                              ? "bg-[#1a1c1e] text-white shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
+                              : "text-[#6b7280] hover:text-[#1a1c1e]"
+                          }`}
+                        >
+                          Buy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTradeMode("sell")}
+                          className={`px-3 py-1 rounded-[8px] text-[12px] font-semibold transition-colors ${
+                            tradeMode === "sell"
+                              ? "bg-[#374151] text-white shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
+                              : "text-[#6b7280] hover:text-[#1a1c1e]"
+                          }`}
+                        >
+                          Sell
+                        </button>
+                      </div>
+                    </div>
 
                     {!user ? (
                       <p className="text-[13px] text-[#6b7280]">Connect your wallet to invest.</p>
@@ -1287,116 +1318,96 @@ export function BucketDetailPage() {
                       </p>
                     ) : !config?.jupiterEnabled ? (
                       <p className="text-[13px] text-[#6b7280]">Jupiter is not enabled on this server.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Buy */}
-                        <div>
-                          <div className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider mb-2">
-                            Buy (mainnet)
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              step="any"
-                              min={minSwapSol || 0}
-                              value={jupiterSol}
-                              onChange={(e) => {
-                                setJupiterSol(e.target.value);
-                                setJupiterBuyPlan(null);
-                              }}
-                              className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
-                              placeholder="SOL"
-                            />
-                            <button
-                              type="button"
-                              disabled={Boolean(busy) || buyBelowMin || !Number.isFinite(buySol) || buySol <= 0}
-                              onClick={() => void buildJupiterBuyPlan()}
-                              className="px-3 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
-                            >
-                              Build
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-[#6b7280] mt-1">
-                            ≈ <span className="font-semibold text-[#1a1c1e]">{formatUsd(buyUsd)}</span>{" "}
-                            {asOfLine && solUsd !== null && (
-                              <span className="text-[#9ca3af]">· {asOfLine}</span>
-                            )}
-                          </p>
-                          {minSwapSol > 0 && (
-                            <p className={`text-[11px] ${buyBelowMin ? "text-red-600" : "text-[#9ca3af]"} mt-0.5`}>
-                              Min: {formatUsd(minSwapUsd)} ({minSwapSol.toFixed(4)} SOL)
-                              {buyBelowMin && " — raise the amount"}
-                            </p>
-                          )}
+                    ) : tradeMode === "buy" ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="any"
+                            min={minSwapSol || 0}
+                            value={jupiterSol}
+                            onChange={(e) => {
+                              setJupiterSol(e.target.value);
+                              setJupiterBuyPlan(null);
+                            }}
+                            className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
+                            placeholder="SOL"
+                          />
+                          <button
+                            type="button"
+                            disabled={Boolean(busy) || buyBelowMin || !Number.isFinite(buySol) || buySol <= 0}
+                            onClick={() => void buildJupiterBuyPlan()}
+                            className="px-3 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
+                          >
+                            Build
+                          </button>
                         </div>
-
-                        <div className="h-px w-[calc(100%+40px)] -ml-5 bg-black/5 shadow-[0_1.5px_0_white]" />
-
-                        {/* Sell */}
-                        <div>
-                          <div className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider mb-2">
-                            Sell
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              step="any"
-                              min={minSwapSol || 0}
-                              max={sellAvailable}
-                              value={sellSol}
-                              onChange={(e) => {
-                                setSellSol(e.target.value);
-                                setJupiterSellPlan(null);
-                              }}
-                              className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
-                              placeholder="SOL out"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setSellSol(String(sellAvailable))}
-                              disabled={sellAvailable <= 0}
-                              className="px-2 py-2 rounded-[10px] border border-black/10 bg-white text-[11px] font-semibold text-[#374151] disabled:opacity-50"
-                            >
-                              Max
-                            </button>
-                            <button
-                              type="button"
-                              disabled={
-                                Boolean(busy) || sellOverMax || sellNonPositive || sellBelowMin
-                              }
-                              onClick={() => void buildJupiterSellPlan()}
-                              className="px-3 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
-                            >
-                              Build
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-[#6b7280] mt-1">
-                            ≈ <span className="font-semibold text-[#1a1c1e]">{formatUsd(sellUsd)}</span>{" "}
-                            {asOfLine && solUsd !== null && (
-                              <span className="text-[#9ca3af]">· {asOfLine}</span>
-                            )}
-                          </p>
-                          <p className="text-[11px] text-[#9ca3af] mt-0.5">
-                            Available: <span className="text-[#374151] font-semibold">{formatUsd(sellAvailableUsd)}</span>{" "}
-                            ({sellAvailable.toFixed(4)} SOL)
-                          </p>
-                          {minSwapSol > 0 && sellBelowMin && (
-                            <p className="text-[11px] text-red-600 mt-0.5">
-                              Min: {formatUsd(minSwapUsd)} ({minSwapSol.toFixed(4)} SOL)
-                            </p>
+                        <p className="text-[11px] text-[#6b7280] -mt-1">
+                          ≈ <span className="font-semibold text-[#1a1c1e]">{formatUsd(buyUsd)}</span>{" "}
+                          {asOfLine && solUsd !== null && (
+                            <span className="text-[#9ca3af]">· {asOfLine}</span>
                           )}
-                          {sellOverMax && (
-                            <p className="text-[11px] text-red-600 mt-0.5">
-                              Exceeds your available position.
-                            </p>
-                          )}
-                        </div>
-
-                        {slippageBlock}
-
-                        <p className="text-[10px] text-[#9ca3af]">
-                          Submit on {rpcDisplayHost(getJupiterSubmitRpcUrl())}.
                         </p>
+                        {minSwapSol > 0 && (
+                          <p className={`text-[11px] ${buyBelowMin ? "text-red-600" : "text-[#9ca3af]"}`}>
+                            Min: {formatUsd(minSwapUsd)} ({minSwapSol.toFixed(4)} SOL)
+                            {buyBelowMin && " — raise the amount"}
+                          </p>
+                        )}
+                        {slippageBlock}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="any"
+                            min={minSwapSol || 0}
+                            max={sellAvailable}
+                            value={sellSol}
+                            onChange={(e) => {
+                              setSellSol(e.target.value);
+                              setJupiterSellPlan(null);
+                            }}
+                            className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
+                            placeholder="SOL out"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSellSol(String(sellAvailable))}
+                            disabled={sellAvailable <= 0}
+                            className="px-2 py-2 rounded-[10px] border border-black/10 bg-white text-[11px] font-semibold text-[#374151] disabled:opacity-50"
+                          >
+                            Max
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(busy) || sellOverMax || sellNonPositive || sellBelowMin}
+                            onClick={() => void buildJupiterSellPlan()}
+                            className="px-3 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
+                          >
+                            Build
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[#6b7280] -mt-1">
+                          ≈ <span className="font-semibold text-[#1a1c1e]">{formatUsd(sellUsd)}</span>{" "}
+                          {asOfLine && solUsd !== null && (
+                            <span className="text-[#9ca3af]">· {asOfLine}</span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-[#9ca3af]">
+                          Available: <span className="text-[#374151] font-semibold">{formatUsd(sellAvailableUsd)}</span>{" "}
+                          ({sellAvailable.toFixed(4)} SOL)
+                        </p>
+                        {minSwapSol > 0 && sellBelowMin && (
+                          <p className="text-[11px] text-red-600">
+                            Min: {formatUsd(minSwapUsd)} ({minSwapSol.toFixed(4)} SOL)
+                          </p>
+                        )}
+                        {sellOverMax && (
+                          <p className="text-[11px] text-red-600">Exceeds your available position.</p>
+                        )}
+                        {slippageBlock}
                       </div>
                     )}
                   </div>

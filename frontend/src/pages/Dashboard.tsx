@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import { BucketGrid } from "../components/BucketGrid";
 import { ConnectWalletModal } from "../components/ConnectWalletModal";
@@ -6,6 +6,8 @@ import type { BucketCardProps } from "../components/BucketCard";
 import { useAuth } from "../context/AuthContext";
 import { fetchPublishedBuckets } from "../lib/api";
 import type { ApiBucket } from "../lib/types";
+import { lamportsToSol, solToUsd } from "../lib/money";
+import { SOL_MINT, usePrices } from "../lib/usePrices";
 import { 
   Coins, 
   TrendingUp, 
@@ -27,19 +29,18 @@ function formatApy(apy: string | number): string {
   return `${n.toFixed(2)}%`;
 }
 
-function formatTvl(tvl: string | number): string {
-  const n = typeof tvl === "string" ? parseFloat(tvl) : tvl;
-  if (!Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
-}
-
-function toCardProps(b: ApiBucket, index: number): BucketCardProps {
+function toCardProps(b: ApiBucket, index: number, solUsd: number | null): BucketCardProps {
   const meta = b.metaData && typeof b.metaData === "object" ? (b.metaData as { description?: string }) : null;
   const desc = meta?.description?.trim() || "A diverse basket of assets on Solana.";
   const assetsCount = b.listing?.length ?? 0;
-  
+
   const Icon = ICONS[index % ICONS.length] ?? Coins;
-  
+
+  const minSwapLamports = b.limits?.minSwapLamports ?? 0;
+  const minBasketSol = minSwapLamports > 0 ? lamportsToSol(minSwapLamports) : undefined;
+  const minBasketUsd =
+    minBasketSol !== undefined ? solToUsd(minBasketSol, solUsd) : null;
+
   return {
     id: b.id,
     title: b.name,
@@ -47,26 +48,38 @@ function toCardProps(b: ApiBucket, index: number): BucketCardProps {
     apy: formatApy(b.estimated_apy),
     creatorName: b.creator?.username,
     assetsCount,
-    icon: <Icon className="w-5 h-5 text-white stroke-[2.5]" />
+    icon: <Icon className="w-5 h-5 text-white stroke-[2.5]" />,
+    ...(minBasketSol !== undefined ? { minBasketSol } : {}),
+    minBasketUsd
   };
 }
 
 export function Dashboard() {
   const { user, logout } = useAuth();
   const [isWalletOpen, setIsWalletOpen] = useState(false);
-  const [buckets, setBuckets] = useState<BucketCardProps[]>([]);
+  /** Raw bucket rows from the API — we re-derive card props whenever SOL price updates. */
+  const [rawBuckets, setRawBuckets] = useState<ApiBucket[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // One usePrices call for the whole grid — every card reads the same solUsd value.
+  const { prices } = usePrices([SOL_MINT]);
+  const solUsd = prices[SOL_MINT]?.price ?? null;
+
+  const buckets: BucketCardProps[] = useMemo(
+    () => rawBuckets.map((b, i) => toCardProps(b, i, solUsd)),
+    [rawBuckets, solUsd]
+  );
 
   const loadBuckets = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const page = await fetchPublishedBuckets({ limit: 50, offset: 0 });
-      setBuckets(page.data.map(toCardProps));
+      setRawBuckets(page.data);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load buckets");
-      setBuckets([]);
+      setRawBuckets([]);
     } finally {
       setLoading(false);
     }
