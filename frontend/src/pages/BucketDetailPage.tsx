@@ -86,7 +86,9 @@ function errHint(code: string): string {
     WALLET_NO_TRANSACTION_SUPPORT: "Wallet cannot send SOL transfers — try Phantom or Backpack.",
     AMOUNT_BELOW_BUCKET_MINIMUM:
       "Amount is below this bucket's minimum. Each asset in the basket needs to receive at least the minimum trade size, so smaller baskets and lower allocations require a higher total amount.",
-    WITHDRAW_EXCEEDS_POSITION: "You're trying to sell more than your current position in this bucket."
+    WITHDRAW_EXCEEDS_POSITION: "You're trying to sell more than your current position in this bucket.",
+    JUPITER_SELL_PLAN_FAILED:
+      "Jupiter couldn't build a sell route for one of the basket assets at this size. Memecoins and thin-liquidity pairs sometimes refuse ExactOut sells at small amounts. Try raising the sell amount or raising slippage (3–5%)."
   };
   return m[code] ?? code;
 }

@@ -159,7 +159,47 @@ export async function jupiterOrder(params: {
     }
     throw new Error(`JUPITER_ORDER_HTTP_${res.status}: ${t.slice(0, 400)}`);
   }
-  return (await res.json()) as { transaction: string; requestId: string; outAmount: string; otherAmountThreshold?: string };
+
+  // Jupiter sometimes returns 200 OK with a quote body but no `transaction` field —
+  // most commonly on ExactOut when the winning router (typically JupiterZ / RFQ) can't
+  // commit a buildable swap. Validate explicitly so we fail loudly instead of pushing
+  // an unsignable plan to the wallet.
+  const data = (await res.json()) as {
+    transaction?: unknown;
+    requestId?: unknown;
+    outAmount?: unknown;
+    otherAmountThreshold?: unknown;
+    mode?: unknown;
+    router?: unknown;
+    swapType?: unknown;
+    error?: unknown;
+  };
+  const tx = typeof data.transaction === "string" ? data.transaction : "";
+  const reqId = typeof data.requestId === "string" ? data.requestId : "";
+  if (!tx || !reqId) {
+    const ctx =
+      `swapMode=${params.swapMode ?? "ExactIn"}` +
+      ` router=${typeof data.router === "string" ? data.router : "?"}` +
+      ` mode=${typeof data.mode === "string" ? data.mode : "?"}` +
+      ` pair=${params.inputMint.slice(0, 4)}…→${params.outputMint.slice(0, 4)}…` +
+      ` amount=${params.amountLamports}` +
+      ` slippageBps=${params.slippageBps}`;
+    const errStr = typeof data.error === "string" ? ` · jupiter: ${data.error}` : "";
+    if (params.swapMode === "ExactOut") {
+      throw new Error(
+        `JUPITER_ORDER_EXACT_OUT_NO_TX: Jupiter returned a quote but no swap transaction. ${ctx}${errStr}`
+      );
+    }
+    throw new Error(`JUPITER_ORDER_NO_TX: ${ctx}${errStr}`);
+  }
+  return {
+    transaction: tx,
+    requestId: reqId,
+    outAmount: typeof data.outAmount === "string" ? data.outAmount : "0",
+    ...(typeof data.otherAmountThreshold === "string"
+      ? { otherAmountThreshold: data.otherAmountThreshold }
+      : {})
+  };
 }
 
 export async function jupiterExecute(params: {
