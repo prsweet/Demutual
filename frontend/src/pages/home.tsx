@@ -8,7 +8,7 @@ export function Home() {
       {/* Card Container */}
       <div 
         className="w-[320px] rounded-[1.25rem] p-5 text-left bg-[#f8f9f7] 
-        shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)]"
+        shadow-[inset_0_0px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)]"
 
       >
         

@@ -48,7 +48,7 @@ export function Topbar({
           <button
             type="button"
             onClick={() => void onDisconnect()}
-            className="flex items-center gap-2 px-4 py-2 bg-[#f8f9f7] text-[#374151] rounded-[10px] text-[14px] font-semibold transition-all active:scale-[0.98] shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)] hover:bg-white"
+            className="flex items-center gap-2 px-4 py-2 bg-[#8b5cf6] text-white rounded-[10px] text-[14px] font-semibold transition-all active:scale-[0.98] shadow-[inset_0_2px_1px_rgba(255,255,255,0.3),inset_0_0_0_0.5px_rgba(255,255,255,0.2),0_0_0_1px_#6d28d9,0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.01)] hover:bg-[#9661f0]"
           >
             <LogOut className="w-4 h-4" />
             Sign out
@@ -57,7 +57,7 @@ export function Topbar({
           <button
             type="button"
             onClick={onConnectWallet}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1a1c1e] hover:bg-[#374151] text-white rounded-[10px] text-[14px] font-semibold transition-all active:scale-[0.98] shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-[#8b5cf6] text-white rounded-[10px] text-[14px] font-semibold transition-all active:scale-[0.98] shadow-[inset_0_2px_1px_rgba(255,255,255,0.3),inset_0_0_0_0.5px_rgba(255,255,255,0.2),0_0_0_1px_#6d28d9,0_12px_24px_-4px_rgba(0,0,0,0.01),0_4px_8px_-2px_rgba(0,0,0,0.01)] hover:bg-[#8743fc]"
           >
             <Wallet className="w-4 h-4" />
             Connect wallet

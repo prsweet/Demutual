@@ -33,7 +33,7 @@ export const API_ROUTE_MANIFEST = {
     "POST /buckets/:id/sell/jupiter-complete": "Per-leg outcome record; only successful legs reduce TVL (mainnet only, auth)",
     "POST /buckets/:id/withdraw": "Ledger-only withdrawal — no on-chain payout (mainnet+devnet, auth)",
     "POST /buckets/:id/creator/assets": "Set draft listings (creator)",
-    "POST /buckets/:id/creator/publish": "Publish draft (creator)",
+    "POST /buckets/:id/creator/publish": "Publish draft with researchDoc markdown — trimmed length ≥100 (creator)",
     "POST /buckets/:id/creator/versions": "Fork new draft version (creator)",
     "POST /buckets/:id/invest (alt)": "Treasury path requires INVEST_TREASURY_PUBKEY + SOLANA_RPC_URL"
   },

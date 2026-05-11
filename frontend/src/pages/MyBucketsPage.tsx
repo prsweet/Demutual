@@ -125,7 +125,13 @@ export function MyBucketsPage() {
                         <p className="text-[15px] font-semibold text-[#1a1c1e]">{b.name}</p>
                         <p className="text-[11px] font-mono text-[#9ca3af]">{b.id}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/buckets/${encodeURIComponent(b.id)}/research`}
+                          className="text-[13px] font-semibold text-[#1a1c1e] hover:underline"
+                        >
+                          Continue research
+                        </Link>
                         <button
                           type="button"
                           onClick={() => {
@@ -138,7 +144,7 @@ export function MyBucketsPage() {
                         </button>
                         <Link
                           to={`/buckets/${encodeURIComponent(b.id)}`}
-                          className="text-[13px] font-semibold text-[#1a1c1e] hover:underline"
+                          className="text-[13px] font-semibold text-[#374151] hover:underline"
                         >
                           Open
                         </Link>

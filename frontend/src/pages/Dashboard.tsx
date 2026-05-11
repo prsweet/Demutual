@@ -6,7 +6,20 @@ import type { BucketCardProps } from "../components/BucketCard";
 import { useAuth } from "../context/AuthContext";
 import { fetchPublishedBuckets } from "../lib/api";
 import type { ApiBucket } from "../lib/types";
-import { Coins } from "lucide-react";
+import { 
+  Coins, 
+  TrendingUp, 
+  Wallet, 
+  PieChart, 
+  Gem, 
+  Activity, 
+  Landmark, 
+  Bitcoin, 
+  Rocket, 
+  Blocks
+} from "lucide-react";
+
+const ICONS: React.ElementType[] = [Coins, TrendingUp, Wallet, PieChart, Gem, Activity, Landmark, Bitcoin, Rocket, Blocks];
 
 function formatApy(apy: string | number): string {
   const n = typeof apy === "string" ? parseFloat(apy) : apy;
@@ -20,21 +33,21 @@ function formatTvl(tvl: string | number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
 }
 
-function toCardProps(b: ApiBucket): BucketCardProps {
+function toCardProps(b: ApiBucket, index: number): BucketCardProps {
   const meta = b.metaData && typeof b.metaData === "object" ? (b.metaData as { description?: string }) : null;
-  const desc =
-    meta?.description?.trim() ||
-    `${b.listing?.length ?? 0} asset${(b.listing?.length ?? 0) === 1 ? "" : "s"} · TVL ${formatTvl(b.tvl)}`;
+  const desc = meta?.description?.trim() || "A diverse basket of assets on Solana.";
+  const assetsCount = b.listing?.length ?? 0;
+  
+  const Icon = ICONS[index % ICONS.length] ?? Coins;
+  
   return {
     id: b.id,
     title: b.name,
     description: desc,
-    metricLabel: "APY",
-    metricValue: formatApy(b.estimated_apy),
-    status: b.type === "PUBLISHED" ? "Live" : "Draft",
+    apy: formatApy(b.estimated_apy),
     creatorName: b.creator?.username,
-    depositors: b._count?.deposits,
-    icon: <Coins className="w-4 h-4 text-white stroke-[2.5]" />
+    assetsCount,
+    icon: <Icon className="w-5 h-5 text-white stroke-[2.5]" />
   };
 }
 

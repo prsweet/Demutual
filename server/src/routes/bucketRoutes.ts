@@ -16,6 +16,7 @@ import {
   jupiterSellCompleteSchema,
   jupiterSellPlanSchema,
   listBucketsQuerySchema,
+  publishBucketSchema,
   withdrawBucketSchema,
   idParamSchema
 } from "../types";
@@ -113,6 +114,7 @@ export const bucketRoutes = new Elysia({ prefix: "/buckets" })
   })
   .post("/:id/creator/publish", bucketControllers.publishBucket, {
     beforeHandle: creatorOnly,
+    body: publishBucketSchema,
     params: idParamSchema
   })
   .post("/:id/creator/versions", bucketControllers.forkBucketVersion, {
