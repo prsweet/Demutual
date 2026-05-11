@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Layout } from "../components/Layout";
 import { ConnectWalletModal } from "../components/ConnectWalletModal";
+import { CreatorVerificationStatus } from "../components/CreatorVerificationStatus";
 import { useAuth } from "../context/AuthContext";
 import { fetchCreatorBuckets } from "../lib/api";
 import type { ApiBucket } from "../lib/types";
@@ -79,6 +80,7 @@ export function MyBucketsPage() {
       user={layoutUser}
     >
       <div className="max-w-3xl mx-auto w-full p-8 pb-16 tracking-tight space-y-8">
+        <CreatorVerificationStatus variant="banner" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-[14px] text-[#6b7280]">
             Drafts and published baskets for <span className="font-semibold text-[#374151]">{user.username}</span>.

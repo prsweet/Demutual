@@ -17,6 +17,12 @@ model User {
     username String
     walletAddress String @unique
     createdAt DateTime @default(now())
+    /// True once this user has clicked "Check now" AND their wallet was confirmed on-chain.
+    /// Gates whether their creator-side fee share is included in investor swaps. Platform fee
+    /// always pays regardless — our wallet is always live.
+    feeReceiverVerified Boolean @default(false)
+    /// When the last successful verification ran. Helpful for re-verify UX and audit.
+    feeReceiverVerifiedAt DateTime?
     buckets Bucket[]
     history History[]
     deposits Deposit[]

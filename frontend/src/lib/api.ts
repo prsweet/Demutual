@@ -178,6 +178,21 @@ export type PricesPayload = {
   staleMints: string[];
 };
 
+export type VerifyFeeReceiverResult = {
+  walletAddress: string;
+  foundOnChain: boolean;
+  verified: boolean;
+  verifiedAt?: string | null;
+  message?: string;
+};
+
+export async function postVerifyFeeReceiver(): Promise<VerifyFeeReceiverResult> {
+  const res = await api.post<ApiResponse<VerifyFeeReceiverResult>>("/users/me/verify-fee-receiver", {});
+  const out = res.data;
+  if (!out.success || !out.data) throw new Error(out.error || "VERIFY_FEE_RECEIVER_FAILED");
+  return out.data;
+}
+
 export async function fetchPrices(mints: string[]): Promise<PricesPayload> {
   const unique = Array.from(new Set(mints.map((m) => m.trim()).filter(Boolean)));
   if (unique.length === 0) return { prices: {}, asOf: Date.now(), staleMints: [] };

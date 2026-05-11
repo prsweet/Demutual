@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import { ConnectWalletModal } from "../components/ConnectWalletModal";
 import { BucketAssetPicker, type AssetRowSelection } from "../components/BucketAssetPicker";
+import { CreatorVerificationStatus } from "../components/CreatorVerificationStatus";
 import { ArrowLeft, Save, Loader2, AlertCircle, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
@@ -235,6 +236,8 @@ export function CreateBucketPage() {
             )}
             {user && <p className="text-[14px] text-[#6b7280] mt-3">Signed in as {user.username}</p>}
           </div>
+
+          {user && <CreatorVerificationStatus variant="panel" />}
 
           {error && (
             <div className="flex items-start gap-2 rounded-[12px] border border-red-200/80 bg-red-50/80 px-3 py-2.5 text-[13px] font-medium text-red-800">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   Connection,
@@ -46,6 +46,12 @@ import {
 } from "../lib/solanaWallet";
 import { getJupiterSubmitRpcUrl, getSolanaRpcUrl, resolveTreasuryPubkey, rpcDisplayHost, setTreasuryInStorage } from "../lib/env";
 import { formatAsOf, formatSol, formatUsd, lamportsToSol, solToUsd } from "../lib/money";
+import {
+  bpsToPercentString,
+  percentStringToBps,
+  recommendSlippageForBasket,
+  SLIPPAGE_PRESETS
+} from "../lib/slippage";
 import { displayTokenName, displayTokenSymbol } from "../lib/tokenLabels";
 import { SOL_MINT, usePrices } from "../lib/usePrices";
 import { useTokenInfo } from "../lib/useTokenInfo";
@@ -161,6 +167,114 @@ export function BucketDetailPage() {
 
   /** Verification + sus flags from Jupiter Tokens v2 for educational badges in the allocations list. */
   const { tokens: tokenInfoMap } = useTokenInfo(listingMints);
+
+  /** Tier-aware slippage recommendation derived from what's in the basket. */
+  const slippageRecommendation = useMemo(() => {
+    const listings = (bucket?.listing ?? []).map((l) => ({
+      assetId: l.assetId,
+      symbol: (l.asset as { symbol?: string } | undefined)?.symbol ?? null
+    }));
+    return recommendSlippageForBasket(listings, tokenInfoMap);
+  }, [bucket, tokenInfoMap]);
+
+  /**
+   * User-chosen slippage in bps. Defaults to the recommendation, re-syncs to the
+   * recommendation whenever the basket's tier changes (e.g. the bucket loads, or the
+   * tier shifts because token info finished loading). User edits override.
+   */
+  const [slippageBps, setSlippageBps] = useState<number>(slippageRecommendation.bps);
+  const [slippageInput, setSlippageInput] = useState<string>(bpsToPercentString(slippageRecommendation.bps));
+  const [slippageEdited, setSlippageEdited] = useState<boolean>(false);
+  useEffect(() => {
+    if (slippageEdited) return;
+    setSlippageBps(slippageRecommendation.bps);
+    setSlippageInput(bpsToPercentString(slippageRecommendation.bps));
+  }, [slippageRecommendation.bps, slippageEdited]);
+
+  const applySlippagePreset = (bps: number) => {
+    setSlippageBps(bps);
+    setSlippageInput(bpsToPercentString(bps));
+    setSlippageEdited(bps !== slippageRecommendation.bps);
+  };
+  const handleSlippageChange = (raw: string) => {
+    setSlippageInput(raw);
+    setSlippageEdited(true);
+    const parsed = percentStringToBps(raw);
+    if (parsed !== null) setSlippageBps(parsed);
+  };
+  const slippageRecommended = slippageBps === slippageRecommendation.bps;
+  const slippageTooLow = slippageBps < 10; // < 0.10% almost always fails
+  const slippageHigh = slippageBps > 500; // > 5% is unusual outside meme dumps
+
+  const slippageBlock = (
+    <div className="mb-4 rounded-[12px] border border-black/8 bg-white/70 p-3">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div>
+          <div className="text-[13px] font-semibold text-[#1a1c1e]">Max slippage</div>
+          <div className="text-[11px] text-[#6b7280] leading-snug">
+            Crypto prices move every few seconds — including while your trade is processing.{" "}
+            <span className="text-[#374151] font-semibold">Too low</span> → trade cancelled.{" "}
+            <span className="text-[#374151] font-semibold">Too high</span> → you may pay a bit more.
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <input
+            type="number"
+            step="0.05"
+            min={0.05}
+            max={50}
+            value={slippageInput}
+            onChange={(e) => handleSlippageChange(e.target.value)}
+            className="w-[80px] px-2 py-1.5 rounded-[8px] border border-black/10 bg-white text-[13px] font-medium tabular-nums text-right"
+            aria-label="Max slippage percent"
+          />
+          <span className="text-[12px] text-[#6b7280] font-semibold">%</span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {SLIPPAGE_PRESETS.map((p) => {
+          const active = slippageBps === p.bps;
+          return (
+            <button
+              key={p.tier}
+              type="button"
+              onClick={() => applySlippagePreset(p.bps)}
+              className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${
+                active
+                  ? "bg-[#1a1c1e] text-white border-[#1a1c1e]"
+                  : "bg-white text-[#374151] border-black/10 hover:bg-black/[0.03]"
+              }`}
+            >
+              {p.label} {bpsToPercentString(p.bps)}%
+            </button>
+          );
+        })}
+        {!slippageRecommended && (
+          <button
+            type="button"
+            onClick={() => applySlippagePreset(slippageRecommendation.bps)}
+            className="px-2.5 py-1 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-semibold hover:bg-emerald-100"
+          >
+            Use recommended {bpsToPercentString(slippageRecommendation.bps)}%
+          </button>
+        )}
+      </div>
+      <div className="text-[11px] leading-snug">
+        <span className="text-[#374151] font-semibold">Recommended {bpsToPercentString(slippageRecommendation.bps)}%</span>
+        <span className="text-[#6b7280]"> — {slippageRecommendation.reason}</span>
+      </div>
+      {slippageTooLow && (
+        <p className="text-[11px] text-red-600 mt-1">
+          {bpsToPercentString(slippageBps)}% is very tight — your trade is likely to get cancelled before it can complete. Try at least 0.10%.
+        </p>
+      )}
+      {!slippageTooLow && slippageHigh && (
+        <p className="text-[11px] text-amber-700 mt-1">
+          {bpsToPercentString(slippageBps)}% is unusually wide — the trade will likely go through, but you may pay noticeably more than expected.
+        </p>
+      )}
+    </div>
+  );
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -306,7 +420,7 @@ export function BucketDetailPage() {
     setError(null);
     setJupiterBuyPlan(null);
     try {
-      const plan = await postJupiterInvestPlan(bucket.id, { solAmount: amount, slippageBps: 80 });
+      const plan = await postJupiterInvestPlan(bucket.id, { solAmount: amount, slippageBps });
       setJupiterBuyPlan(plan);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -602,7 +716,7 @@ export function BucketDetailPage() {
     setError(null);
     setPartialResult(null);
     try {
-      const plan = await postJupiterSellPlan(bucket.id, { solAmount: amount, slippageBps: 80 });
+      const plan = await postJupiterSellPlan(bucket.id, { solAmount: amount, slippageBps });
       const swaps = plan.legs
         .filter(
           (l): l is JupiterPlanLeg & { swapTransactionBase64: string; legId: string } =>
@@ -1008,6 +1122,12 @@ export function BucketDetailPage() {
               </p>
             )}
 
+            {user?.id === bucket.creatorId && (
+              <div className="mt-6 rounded-[10px] border border-amber-200/70 bg-amber-50/60 px-3 py-2 text-[12px] text-amber-900 leading-snug">
+                <span className="font-semibold">Creator note:</span> investor fees pay out to your connected wallet. Make sure that wallet has been used on Solana before — if it's brand new, send any small amount of SOL to it from an exchange or another wallet so it exists on-chain. Otherwise individual fee transfers are skipped (your buyers still get their tokens).
+              </div>
+            )}
+
             {user && published && (
               <>
                 <div className="h-px w-full bg-black/5 shadow-[0_1px_0_white] my-6" />
@@ -1134,14 +1254,17 @@ export function BucketDetailPage() {
                 })()}
                 
                 {!jupiterBuyPlan ? (
-                  <button
-                    type="button"
-                    disabled={Boolean(busy)}
-                    onClick={() => void buildJupiterBuyPlan()}
-                    className="px-5 py-2.5 rounded-[10px] bg-[#1a1c1e] text-white text-[14px] font-semibold disabled:opacity-50"
-                  >
-                    Build Plan & Preview
-                  </button>
+                  <>
+                    {slippageBlock}
+                    <button
+                      type="button"
+                      disabled={Boolean(busy)}
+                      onClick={() => void buildJupiterBuyPlan()}
+                      className="px-5 py-2.5 rounded-[10px] bg-[#1a1c1e] text-white text-[14px] font-semibold disabled:opacity-50"
+                    >
+                      Build Plan & Preview
+                    </button>
+                  </>
                 ) : (
                   <div className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50">
                     <h3 className="text-[14px] font-semibold text-blue-900 mb-3">Plan Preview</h3>
@@ -1381,11 +1504,12 @@ export function BucketDetailPage() {
                           Exceeds your available position ({formatUsd(maxUsd)}).
                         </p>
                       )}
+                      <div className="mt-3">{slippageBlock}</div>
                       <button
                         type="button"
                         disabled={Boolean(busy) || overMax || nonPositive || belowMin}
                         onClick={() => void runJupiterSell()}
-                        className="mt-2 px-5 py-2.5 rounded-[10px] bg-[#374151] text-white text-[14px] font-semibold disabled:opacity-50"
+                        className="px-5 py-2.5 rounded-[10px] bg-[#374151] text-white text-[14px] font-semibold disabled:opacity-50"
                       >
                         Sell via Jupiter
                       </button>

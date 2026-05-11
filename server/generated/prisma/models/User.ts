@@ -29,6 +29,8 @@ export type UserMinAggregateOutputType = {
   username: string | null
   walletAddress: string | null
   createdAt: Date | null
+  feeReceiverVerified: boolean | null
+  feeReceiverVerifiedAt: Date | null
 }
 
 export type UserMaxAggregateOutputType = {
@@ -36,6 +38,8 @@ export type UserMaxAggregateOutputType = {
   username: string | null
   walletAddress: string | null
   createdAt: Date | null
+  feeReceiverVerified: boolean | null
+  feeReceiverVerifiedAt: Date | null
 }
 
 export type UserCountAggregateOutputType = {
@@ -43,6 +47,8 @@ export type UserCountAggregateOutputType = {
   username: number
   walletAddress: number
   createdAt: number
+  feeReceiverVerified: number
+  feeReceiverVerifiedAt: number
   _all: number
 }
 
@@ -52,6 +58,8 @@ export type UserMinAggregateInputType = {
   username?: true
   walletAddress?: true
   createdAt?: true
+  feeReceiverVerified?: true
+  feeReceiverVerifiedAt?: true
 }
 
 export type UserMaxAggregateInputType = {
@@ -59,6 +67,8 @@ export type UserMaxAggregateInputType = {
   username?: true
   walletAddress?: true
   createdAt?: true
+  feeReceiverVerified?: true
+  feeReceiverVerifiedAt?: true
 }
 
 export type UserCountAggregateInputType = {
@@ -66,6 +76,8 @@ export type UserCountAggregateInputType = {
   username?: true
   walletAddress?: true
   createdAt?: true
+  feeReceiverVerified?: true
+  feeReceiverVerifiedAt?: true
   _all?: true
 }
 
@@ -146,6 +158,8 @@ export type UserGroupByOutputType = {
   username: string
   walletAddress: string
   createdAt: Date
+  feeReceiverVerified: boolean
+  feeReceiverVerifiedAt: Date | null
   _count: UserCountAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
@@ -174,6 +188,8 @@ export type UserWhereInput = {
   username?: Prisma.StringFilter<"User"> | string
   walletAddress?: Prisma.StringFilter<"User"> | string
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  feeReceiverVerified?: Prisma.BoolFilter<"User"> | boolean
+  feeReceiverVerifiedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   buckets?: Prisma.BucketListRelationFilter
   history?: Prisma.HistoryListRelationFilter
   deposits?: Prisma.DepositListRelationFilter
@@ -186,6 +202,8 @@ export type UserOrderByWithRelationInput = {
   username?: Prisma.SortOrder
   walletAddress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  feeReceiverVerified?: Prisma.SortOrder
+  feeReceiverVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   buckets?: Prisma.BucketOrderByRelationAggregateInput
   history?: Prisma.HistoryOrderByRelationAggregateInput
   deposits?: Prisma.DepositOrderByRelationAggregateInput
@@ -201,6 +219,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   username?: Prisma.StringFilter<"User"> | string
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  feeReceiverVerified?: Prisma.BoolFilter<"User"> | boolean
+  feeReceiverVerifiedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   buckets?: Prisma.BucketListRelationFilter
   history?: Prisma.HistoryListRelationFilter
   deposits?: Prisma.DepositListRelationFilter
@@ -213,6 +233,8 @@ export type UserOrderByWithAggregationInput = {
   username?: Prisma.SortOrder
   walletAddress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  feeReceiverVerified?: Prisma.SortOrder
+  feeReceiverVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
   _min?: Prisma.UserMinOrderByAggregateInput
@@ -226,6 +248,8 @@ export type UserScalarWhereWithAggregatesInput = {
   username?: Prisma.StringWithAggregatesFilter<"User"> | string
   walletAddress?: Prisma.StringWithAggregatesFilter<"User"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
+  feeReceiverVerified?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
+  feeReceiverVerifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
 }
 
 export type UserCreateInput = {
@@ -233,6 +257,8 @@ export type UserCreateInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
@@ -245,6 +271,8 @@ export type UserUncheckedCreateInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
@@ -257,6 +285,8 @@ export type UserUpdateInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
@@ -269,6 +299,8 @@ export type UserUncheckedUpdateInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
@@ -281,6 +313,8 @@ export type UserCreateManyInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
 }
 
 export type UserUpdateManyMutationInput = {
@@ -288,6 +322,8 @@ export type UserUpdateManyMutationInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type UserUncheckedUpdateManyInput = {
@@ -295,6 +331,8 @@ export type UserUncheckedUpdateManyInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type UserCountOrderByAggregateInput = {
@@ -302,6 +340,8 @@ export type UserCountOrderByAggregateInput = {
   username?: Prisma.SortOrder
   walletAddress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  feeReceiverVerified?: Prisma.SortOrder
+  feeReceiverVerifiedAt?: Prisma.SortOrder
 }
 
 export type UserMaxOrderByAggregateInput = {
@@ -309,6 +349,8 @@ export type UserMaxOrderByAggregateInput = {
   username?: Prisma.SortOrder
   walletAddress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  feeReceiverVerified?: Prisma.SortOrder
+  feeReceiverVerifiedAt?: Prisma.SortOrder
 }
 
 export type UserMinOrderByAggregateInput = {
@@ -316,6 +358,8 @@ export type UserMinOrderByAggregateInput = {
   username?: Prisma.SortOrder
   walletAddress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  feeReceiverVerified?: Prisma.SortOrder
+  feeReceiverVerifiedAt?: Prisma.SortOrder
 }
 
 export type UserScalarRelationFilter = {
@@ -329,6 +373,14 @@ export type StringFieldUpdateOperationsInput = {
 
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
 }
 
 export type UserCreateNestedOneWithoutDepositsInput = {
@@ -406,6 +458,8 @@ export type UserCreateWithoutDepositsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
@@ -417,6 +471,8 @@ export type UserUncheckedCreateWithoutDepositsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
@@ -444,6 +500,8 @@ export type UserUpdateWithoutDepositsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
@@ -455,6 +513,8 @@ export type UserUncheckedUpdateWithoutDepositsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
@@ -466,6 +526,8 @@ export type UserCreateWithoutWithdrawalsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
@@ -477,6 +539,8 @@ export type UserUncheckedCreateWithoutWithdrawalsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
@@ -504,6 +568,8 @@ export type UserUpdateWithoutWithdrawalsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
@@ -515,6 +581,8 @@ export type UserUncheckedUpdateWithoutWithdrawalsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
@@ -526,6 +594,8 @@ export type UserCreateWithoutHistoryInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
@@ -537,6 +607,8 @@ export type UserUncheckedCreateWithoutHistoryInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
@@ -564,6 +636,8 @@ export type UserUpdateWithoutHistoryInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
@@ -575,6 +649,8 @@ export type UserUncheckedUpdateWithoutHistoryInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
@@ -586,6 +662,8 @@ export type UserCreateWithoutBucketsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutUserInput
@@ -597,6 +675,8 @@ export type UserUncheckedCreateWithoutBucketsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutUserInput
@@ -624,6 +704,8 @@ export type UserUpdateWithoutBucketsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutUserNestedInput
@@ -635,6 +717,8 @@ export type UserUncheckedUpdateWithoutBucketsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutUserNestedInput
@@ -646,6 +730,8 @@ export type UserCreateWithoutBasketAttemptsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositCreateNestedManyWithoutUserInput
@@ -657,6 +743,8 @@ export type UserUncheckedCreateWithoutBasketAttemptsInput = {
   username: string
   walletAddress: string
   createdAt?: Date | string
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: Date | string | null
   buckets?: Prisma.BucketUncheckedCreateNestedManyWithoutCreatorInput
   history?: Prisma.HistoryUncheckedCreateNestedManyWithoutUserInput
   deposits?: Prisma.DepositUncheckedCreateNestedManyWithoutUserInput
@@ -684,6 +772,8 @@ export type UserUpdateWithoutBasketAttemptsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUpdateManyWithoutUserNestedInput
@@ -695,6 +785,8 @@ export type UserUncheckedUpdateWithoutBasketAttemptsInput = {
   username?: Prisma.StringFieldUpdateOperationsInput | string
   walletAddress?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeReceiverVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  feeReceiverVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   buckets?: Prisma.BucketUncheckedUpdateManyWithoutCreatorNestedInput
   history?: Prisma.HistoryUncheckedUpdateManyWithoutUserNestedInput
   deposits?: Prisma.DepositUncheckedUpdateManyWithoutUserNestedInput
@@ -773,6 +865,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   username?: boolean
   walletAddress?: boolean
   createdAt?: boolean
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: boolean
   buckets?: boolean | Prisma.User$bucketsArgs<ExtArgs>
   history?: boolean | Prisma.User$historyArgs<ExtArgs>
   deposits?: boolean | Prisma.User$depositsArgs<ExtArgs>
@@ -786,6 +880,8 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   username?: boolean
   walletAddress?: boolean
   createdAt?: boolean
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -793,6 +889,8 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   username?: boolean
   walletAddress?: boolean
   createdAt?: boolean
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
@@ -800,9 +898,11 @@ export type UserSelectScalar = {
   username?: boolean
   walletAddress?: boolean
   createdAt?: boolean
+  feeReceiverVerified?: boolean
+  feeReceiverVerifiedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "username" | "walletAddress" | "createdAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "username" | "walletAddress" | "createdAt" | "feeReceiverVerified" | "feeReceiverVerifiedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   buckets?: boolean | Prisma.User$bucketsArgs<ExtArgs>
   history?: boolean | Prisma.User$historyArgs<ExtArgs>
@@ -828,6 +928,16 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     username: string
     walletAddress: string
     createdAt: Date
+    /**
+     * True once this user has clicked "Check now" AND their wallet was confirmed on-chain.
+     * Gates whether their creator-side fee share is included in investor swaps. Platform fee
+     * always pays regardless — our wallet is always live.
+     */
+    feeReceiverVerified: boolean
+    /**
+     * When the last successful verification ran. Helpful for re-verify UX and audit.
+     */
+    feeReceiverVerifiedAt: Date | null
   }, ExtArgs["result"]["user"]>
   composites: {}
 }
@@ -1260,6 +1370,8 @@ export interface UserFieldRefs {
   readonly username: Prisma.FieldRef<"User", 'String'>
   readonly walletAddress: Prisma.FieldRef<"User", 'String'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly feeReceiverVerified: Prisma.FieldRef<"User", 'Boolean'>
+  readonly feeReceiverVerifiedAt: Prisma.FieldRef<"User", 'DateTime'>
 }
     
 

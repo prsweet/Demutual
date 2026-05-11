@@ -13,6 +13,9 @@ export const userRoutes = new Elysia({ prefix: "/users" })
   .get("/me/attempts", basketAttemptControllers.listMyAttempts, {
     beforeHandle: authMiddlewares.requireAuth,
     query: myAttemptsQuerySchema
+  })
+  .post("/me/verify-fee-receiver", userControllers.verifyFeeReceiver, {
+    beforeHandle: authMiddlewares.requireAuth
   });
 
 /** Top-level attempt abandon — direction-agnostic, mounted off the API root. */

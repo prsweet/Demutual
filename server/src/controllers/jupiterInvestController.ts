@@ -84,7 +84,7 @@ const buildJupiterPlan = async ({
       where: { id: params.id },
       include: {
         listing: { include: { asset: true } },
-        creator: { select: { walletAddress: true } }
+        creator: { select: { walletAddress: true, feeReceiverVerified: true } }
       }
     });
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
@@ -96,8 +96,11 @@ const buildJupiterPlan = async ({
     const platWallet = platformFeeWallet();
     const creatorBps = creatorFeeBps();
     const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
+    const creatorVerified = Boolean(bucket.creator?.feeReceiverVerified);
 
     const platLamports = platformFeeActive() ? Math.floor((swapLamports * platBps) / 10000) : 0;
+    // Creator share is calculated regardless of verification so the investor's gross-up math
+    // stays consistent; we just skip its actual transfer below until the creator verifies.
     const creatorLamports =
       creatorBps > 0 && creatorWallet ? Math.floor((swapLamports * creatorBps) / 10000) : 0;
     const grossLamports = swapLamports + platLamports + creatorLamports;
@@ -194,47 +197,67 @@ const buildJupiterPlan = async ({
       return status(400, response(false, null, errors.jupiterNothingToSwap400));
     }
 
-    const splitsRaw: { recipient: "platform" | "creator"; toPubkey: string; lamports: number; bps: number }[] = [
-      ...(platLamports > 0 && platWallet
-        ? [{ recipient: "platform" as const, toPubkey: platWallet, lamports: platLamports, bps: platBps }]
-        : []),
-      ...(creatorLamports > 0 && creatorWallet
-        ? [{ recipient: "creator" as const, toPubkey: creatorWallet, lamports: creatorLamports, bps: creatorBps }]
-        : [])
-    ];
+    type Split = {
+      recipient: "platform" | "creator";
+      toPubkey: string;
+      lamports: number;
+      bps: number;
+    };
+    const candidates: Split[] = [];
+    if (platLamports > 0 && platWallet) {
+      candidates.push({ recipient: "platform", toPubkey: platWallet, lamports: platLamports, bps: platBps });
+    }
+    // Creator fee only enters the split set if the creator has explicitly verified their wallet
+    // via /users/me/verify-fee-receiver. Until then we just skip it; platform fee still pays.
+    const creatorSkippedUnverified = creatorLamports > 0 && creatorWallet && !creatorVerified;
+    if (creatorLamports > 0 && creatorWallet && creatorVerified) {
+      candidates.push({ recipient: "creator", toPubkey: creatorWallet, lamports: creatorLamports, bps: creatorBps });
+    }
 
-    let feeTransferSkippedReason: string | null = null;
+    const skippedReasons: string[] = [];
+    if (creatorSkippedUnverified) {
+      skippedReasons.push(
+        "Creator fee skipped: bucket creator has not verified their fee-receiver wallet yet (platform fee paid as normal)."
+      );
+    }
+
     let safeFeeTransfer: {
       totalLamports: number;
-      splits: typeof splitsRaw;
+      splits: Split[];
       reason: string;
     } | null = null;
 
-    if (splitsRaw.length > 0) {
+    if (candidates.length > 0) {
       const safetyCheck = rpcUrl
-        ? await checkFeeRecipientsRentSafe({ rpcUrl, recipients: splitsRaw }).catch((e) => {
+        ? await checkFeeRecipientsRentSafe({ rpcUrl, recipients: candidates }).catch((e) => {
             console.warn("[feeRecipientCheck] failed", e);
             return null;
           })
         : null;
 
-      if (safetyCheck && safetyCheck.unsafe.length > 0) {
-        feeTransferSkippedReason =
-          `Skipped fee transfer: ${safetyCheck.unsafe.length} recipient(s) ` +
-          `do not exist on-chain and the split (${safetyCheck.unsafe
-            .map((u) => `${u.lamports} lamports`)
-            .join(", ")}) is below the system rent-exempt minimum ` +
-          `(${safetyCheck.systemAccountRentExemptLamports} lamports). ` +
-          `Fund those recipient wallets with at least the rent-exempt minimum or raise PLATFORM_FEE_BPS / CREATOR_FEE_BPS so each split exceeds it.`;
-      } else {
+      const unsafeKeys = new Set((safetyCheck?.unsafe ?? []).map((u) => u.toPubkey));
+      const safeSplits = candidates.filter((c) => !unsafeKeys.has(c.toPubkey));
+      const droppedForRent = candidates.filter((c) => unsafeKeys.has(c.toPubkey));
+
+      if (droppedForRent.length > 0 && safetyCheck) {
+        for (const d of droppedForRent) {
+          skippedReasons.push(
+            `${d.recipient === "platform" ? "Platform" : "Creator"} fee skipped: recipient wallet doesn't exist on-chain and the split (${d.lamports} lamports) is below the rent-exempt minimum (${safetyCheck.systemAccountRentExemptLamports} lamports).`
+          );
+        }
+      }
+
+      if (safeSplits.length > 0) {
         safeFeeTransfer = {
-          totalLamports: platLamports + creatorLamports,
-          splits: splitsRaw,
+          totalLamports: safeSplits.reduce((s, c) => s + c.lamports, 0),
+          splits: safeSplits,
           reason:
-            "Investor-signed SOL transfer with both fee splits in ONE tx. Send BEFORE the swap legs and pass its signature to /invest/jupiter-complete."
+            "Investor-signed SOL transfer with the eligible fee splits in ONE tx. Send BEFORE the swap legs and pass its signature to /invest/jupiter-complete."
         };
       }
     }
+
+    const feeTransferSkippedReason = skippedReasons.length > 0 ? skippedReasons.join(" ") : null;
 
     return status(
       200,
@@ -323,9 +346,10 @@ const completeJupiterInvest = async ({
 
     const bucketCreator = await prisma.bucket.findUnique({
       where: { id: params.id },
-      select: { creator: { select: { walletAddress: true } } }
+      select: { creator: { select: { walletAddress: true, feeReceiverVerified: true } } }
     });
     const creatorWallet = bucketCreator?.creator?.walletAddress?.trim() || null;
+    const creatorVerified = Boolean(bucketCreator?.creator?.feeReceiverVerified);
 
     const platBps = platformFeeBps();
     const platWallet = platformFeeWallet();
@@ -334,8 +358,9 @@ const completeJupiterInvest = async ({
     const expectedPlat = platformFeeActive()
       ? Math.floor((intendedSwapLamports * platBps) / 10000)
       : 0;
+    // Creator side included in expected transfers only when verified — mirrors the build path.
     const expectedCreator =
-      creatorBps > 0 && creatorWallet
+      creatorBps > 0 && creatorWallet && creatorVerified
         ? Math.floor((intendedSwapLamports * creatorBps) / 10000)
         : 0;
     const expectedTransfers: { to: string; lamports: bigint }[] = [];

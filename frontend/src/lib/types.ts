@@ -8,6 +8,9 @@ export type MeUser = {
   username: string;
   walletAddress: string;
   createdAt: string;
+  /** Has this creator verified their fee-receiver wallet is on-chain? Gates creator-side payouts. */
+  feeReceiverVerified: boolean;
+  feeReceiverVerifiedAt?: string | null;
   counts?: { buckets: number; deposits: number; withdrawals: number };
 };
 
