@@ -697,14 +697,43 @@ export function BucketDetailPage() {
   };
 
   const executeJupiterSellPlan = async () => {
-    if (!jupiterSellPlan || !bucket || !published || !user) return;
+    // Immediate busy state so the user sees feedback the click fired.
+    setBusy("Initializing sell…");
+    setError(null);
+    setPartialResult(null);
+
+    if (!jupiterSellPlan) {
+      setError("No sell plan loaded — click Build again.");
+      setBusy(null);
+      return;
+    }
+    if (!bucket) {
+      setError("Bucket not loaded.");
+      setBusy(null);
+      return;
+    }
+    if (!published) {
+      setError("Bucket is not published — cannot sell.");
+      setBusy(null);
+      return;
+    }
+    if (!user) {
+      setError("Sign in to sell.");
+      setBusy(null);
+      setIsWalletOpen(true);
+      return;
+    }
     const provider = getConnectedProvider();
     if (!provider || !walletAddr) {
-      setError("Connect wallet first.");
+      setError("Connect a wallet first (Phantom / Backpack).");
+      setBusy(null);
       return;
     }
     if (!walletMatches) {
-      setError("Connected wallet must match login.");
+      setError(
+        `Connected wallet (${walletAddr.slice(0, 4)}…${walletAddr.slice(-4)}) doesn't match your logged-in wallet. Reconnect with the right one.`
+      );
+      setBusy(null);
       return;
     }
     const plan = jupiterSellPlan;
@@ -725,17 +754,26 @@ export function BucketDetailPage() {
       }));
 
     if (swaps.length === 0) {
-      setError("No sell legs returned.");
+      setError(
+        `Sell plan has no valid swap legs (plan.legs.length=${plan.legs.length}). Rebuild the plan.`
+      );
+      setBusy(null);
+      return;
+    }
+    const missingRequestIds = swaps.filter((s) => !s.requestId).length;
+    if (missingRequestIds > 0) {
+      setError(
+        `${missingRequestIds} sell leg(s) missing a Jupiter requestId — server response was incomplete. Rebuild the plan.`
+      );
+      setBusy(null);
       return;
     }
     const attemptId = (plan as unknown as { attemptId?: string }).attemptId ?? "";
     if (!attemptId) {
       setError("Plan is missing attemptId — rebuild the sell plan.");
+      setBusy(null);
       return;
     }
-
-    setError(null);
-    setPartialResult(null);
     try {
       const hasFee = !!(plan.feeTransfer && plan.feeTransfer.splits.length > 0);
       let feeTransferSignature: string | undefined;
@@ -1612,6 +1650,20 @@ export function BucketDetailPage() {
                         Close
                       </button>
                     </div>
+
+                    {error && (
+                      <div className="mb-3 flex items-start gap-2 rounded-[12px] border border-red-200/80 bg-red-50/80 px-3 py-2.5 text-[13px] font-medium text-red-800">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{error}</span>
+                      </div>
+                    )}
+
+                    {busy && (
+                      <div className="mb-3 flex items-center gap-2 rounded-[12px] border border-blue-200/70 bg-blue-50/70 px-3 py-2.5 text-[13px] font-medium text-blue-900">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        <span>{busy}</span>
+                      </div>
+                    )}
 
                     <div className="rounded-[1.25rem] border border-black/8 bg-[#f8f9f7] p-5 shadow-[inset_0_2px_8px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.9)]">
                       <div className="mb-3 flex items-center justify-between">
