@@ -1,7 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 @import "../styles/globals.css";
 
 @layer base {
   :root {
+    --font-sans: "Inter", sans-serif;
+    --font-serif: "Instrument Serif", serif;
     @apply font-sans;
   }
 

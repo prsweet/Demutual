@@ -1103,7 +1103,7 @@ export function BucketDetailPage() {
       <div className="w-full h-full p-6 tracking-tight">
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/dashboard")}
           className="flex items-center gap-2 text-[14px] font-semibold text-[#6b7280] hover:text-[#1a1c1e] mb-4"
         >
           <ArrowLeft className="w-4 h-4" />

@@ -350,7 +350,7 @@ export function CreateBucketPage() {
           <div className="pt-2 flex flex-wrap justify-end gap-3">
             <button
               type="button"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/dashboard")}
               className="px-5 py-3 rounded-[12px] text-[15px] font-semibold text-[#374151] bg-white border border-black/10 shadow-sm hover:bg-black/2 transition-all"
             >
               Cancel

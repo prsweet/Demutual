@@ -68,7 +68,7 @@ export function Sidebar({ user, collapsed = false }: { user?: LayoutUser; collap
         )}
 
         <NavLink
-          to="/"
+          to="/dashboard"
           end
           title="Trending buckets"
           className={({ isActive }) =>
