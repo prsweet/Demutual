@@ -1459,7 +1459,7 @@ export function BucketDetailPage() {
                             <div
                               key={l.id}
                               onClick={() => setSelectedMint(l.assetId)}
-                              className="flex items-center gap-3"
+                              className="flex items-center gap-3 cursor-pointer"
                             >
                               <div className="w-8 h-8 rounded-[10px] bg-white border border-black/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center overflow-hidden shrink-0">
                                 {iconUrl ? (
