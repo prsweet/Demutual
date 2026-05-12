@@ -165,6 +165,8 @@ export function BucketDetailPage() {
   const [planDialog, setPlanDialog] = useState<null | { kind: "buy" | "sell" }>(null);
   /** Tabbed buy/sell panel — only one side visible at a time so the panel stays compact. */
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
+  /** Mint of the token whose Birdeye chart is shown in the left panel. Null = default to top-weighted. */
+  const [selectedMint, setSelectedMint] = useState<string | null>(null);
   /** Ephemeral "copied" feedback for the creator-wallet copy button. */
   const [copiedCreator, setCopiedCreator] = useState(false);
   const copyCreatorWallet = async () => {
@@ -980,20 +982,25 @@ export function BucketDetailPage() {
   const minSwapSol = bucket?.limits ? lamportsToSol(bucket.limits.minSwapLamports) : 0;
   const minSwapUsd = solToUsd(minSwapSol, solUsd);
 
-  // Top-weighted asset drives the Birdeye chart in the left panel.
-  const topListing = (() => {
+  // Birdeye chart shows the user's selected token from the allocation list, or
+  // falls back to the highest-weighted asset if nothing has been clicked.
+  const chartListing = useMemo(() => {
     const listings = bucket?.listing ?? [];
+    if (selectedMint) {
+      const hit = listings.find((l) => l.assetId === selectedMint);
+      if (hit) return hit;
+    }
     if (listings.length === 0) return null;
     return [...listings].sort((a, b) => Number(b.percentage) - Number(a.percentage))[0] ?? null;
-  })();
-  const topInfo = topListing ? tokenInfoMap[topListing.assetId] ?? null : null;
-  const topAssetRel = topListing?.asset as { symbol?: string; iconUrl?: string } | undefined;
-  const topRawSymbol = topInfo?.symbol ?? topAssetRel?.symbol ?? topListing?.assetId.slice(0, 6) ?? "";
-  const topSymbol = topListing
-    ? displayTokenSymbol(topListing.assetId, topRawSymbol) ?? topRawSymbol
+  }, [bucket?.listing, selectedMint]);
+  const chartInfo = chartListing ? tokenInfoMap[chartListing.assetId] ?? null : null;
+  const chartAssetRel = chartListing?.asset as { symbol?: string; iconUrl?: string } | undefined;
+  const chartRawSymbol = chartInfo?.symbol ?? chartAssetRel?.symbol ?? chartListing?.assetId.slice(0, 6) ?? "";
+  const chartSymbol = chartListing
+    ? displayTokenSymbol(chartListing.assetId, chartRawSymbol) ?? chartRawSymbol
     : "";
-  const topIcon = topInfo?.iconUrl || topAssetRel?.iconUrl || null;
-  const topPct = topListing ? Number(topListing.percentage) : null;
+  const chartIcon = chartInfo?.iconUrl || chartAssetRel?.iconUrl || null;
+  const chartPct = chartListing ? Number(chartListing.percentage) : null;
 
   /**
    * Weighted 24h price change across the basket. Real, live number — refreshes whenever
@@ -1397,12 +1404,12 @@ export function BucketDetailPage() {
                     highest-weighted asset in this bucket. */}
                 <div className="w-1/2">
                   <div className={["h-full rounded-[1.25rem] bg-[#f8f9f7] p-5 flex flex-col", panelShadow].join(" ")}>
-                    {topListing ? (
+                    {chartListing ? (
                       <BirdeyeChart
-                        mint={topListing.assetId}
-                        symbol={topSymbol}
-                        iconUrl={topIcon}
-                        weightPct={topPct}
+                        mint={chartListing.assetId}
+                        symbol={chartSymbol}
+                        iconUrl={chartIcon}
+                        weightPct={chartPct}
                       />
                     ) : (
                       <div className="flex-1 rounded-[1rem] border border-black/8 bg-[#f4f4f4] shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] flex items-center justify-center">
@@ -1449,7 +1456,11 @@ export function BucketDetailPage() {
                           const verified = isSol || info?.isVerified;
                           const sus = !isSol && info?.isSus;
                           return (
-                            <div key={l.id} className="flex items-center gap-3">
+                            <div
+                              key={l.id}
+                              onClick={() => setSelectedMint(l.assetId)}
+                              className="flex items-center gap-3"
+                            >
                               <div className="w-8 h-8 rounded-[10px] bg-white border border-black/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center overflow-hidden shrink-0">
                                 {iconUrl ? (
                                   <img
