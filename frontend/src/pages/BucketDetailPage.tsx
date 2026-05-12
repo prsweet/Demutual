@@ -73,6 +73,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import { researchMarkdownComponents } from "../components/ResearchDocEditor";
 import { BirdeyeChart } from "../components/BirdeyeChart";
+import { TransactionToast } from "../components/TransactionToast";
 
 const DRAFT_LS = "demutual_draft_bucket_id";
 
@@ -167,6 +168,15 @@ export function BucketDetailPage() {
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
   /** Mint of the token whose Birdeye chart is shown in the left panel. Null = default to top-weighted. */
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
+  /** Transient success message — when non-null, the green TransactionToast slides up. */
+  const [txSuccess, setTxSuccess] = useState<string | null>(null);
+
+  // Auto-dismiss the success toast after a beat so it doesn't linger.
+  useEffect(() => {
+    if (!txSuccess) return;
+    const t = window.setTimeout(() => setTxSuccess(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [txSuccess]);
   /** Ephemeral "copied" feedback for the creator-wallet copy button. */
   const [copiedCreator, setCopiedCreator] = useState(false);
   const copyCreatorWallet = async () => {
@@ -375,6 +385,7 @@ export function BucketDetailPage() {
       setTreasuryInStorage(pkTreasury);
       await load();
       await loadPosition();
+      setTxSuccess("Invest completed");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(hintIfRentError(msg) || errHint(msg) || msg);
@@ -562,7 +573,11 @@ export function BucketDetailPage() {
             };
           })
         });
+      } else {
+        console.log("[demutual] buy COMPLETE — firing toast");
+        setTxSuccess("Buy completed");
       }
+      console.log("[demutual] buy flow attemptStatus =", attemptStatus);
       setJupiterBuyPlan(null);
       setPlanDialog(null);
       await load();
@@ -617,6 +632,8 @@ export function BucketDetailPage() {
             };
           })
         });
+      } else {
+        setTxSuccess("Buy completed");
       }
       await load();
       await loadPosition();
@@ -877,6 +894,8 @@ export function BucketDetailPage() {
             };
           })
         });
+      } else {
+        setTxSuccess("Sell completed");
       }
       setJupiterSellPlan(null);
       setPlanDialog(null);
@@ -940,6 +959,8 @@ export function BucketDetailPage() {
             };
           })
         });
+      } else {
+        setTxSuccess("Sell completed");
       }
       await load();
       await loadPosition();
@@ -2009,6 +2030,8 @@ export function BucketDetailPage() {
             {busy}
           </div>
         )}
+
+        <TransactionToast show={Boolean(txSuccess)} />
 
         {!published && user?.id === bucket?.creatorId && (
           <p className="mt-6 text-[13px] text-[#6b7280]">
