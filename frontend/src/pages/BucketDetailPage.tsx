@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { researchMarkdownComponents } from "../components/ResearchDocEditor";
+import { BirdeyeChart } from "../components/BirdeyeChart";
 
 const DRAFT_LS = "demutual_draft_bucket_id";
 
@@ -979,6 +980,21 @@ export function BucketDetailPage() {
   const minSwapSol = bucket?.limits ? lamportsToSol(bucket.limits.minSwapLamports) : 0;
   const minSwapUsd = solToUsd(minSwapSol, solUsd);
 
+  // Top-weighted asset drives the Birdeye chart in the left panel.
+  const topListing = (() => {
+    const listings = bucket?.listing ?? [];
+    if (listings.length === 0) return null;
+    return [...listings].sort((a, b) => Number(b.percentage) - Number(a.percentage))[0] ?? null;
+  })();
+  const topInfo = topListing ? tokenInfoMap[topListing.assetId] ?? null : null;
+  const topAssetRel = topListing?.asset as { symbol?: string; iconUrl?: string } | undefined;
+  const topRawSymbol = topInfo?.symbol ?? topAssetRel?.symbol ?? topListing?.assetId.slice(0, 6) ?? "";
+  const topSymbol = topListing
+    ? displayTokenSymbol(topListing.assetId, topRawSymbol) ?? topRawSymbol
+    : "";
+  const topIcon = topInfo?.iconUrl || topAssetRel?.iconUrl || null;
+  const topPct = topListing ? Number(topListing.percentage) : null;
+
   /**
    * Weighted 24h price change across the basket. Real, live number — refreshes whenever
    * `usePrices` polls. Honest framing: this is *today*'s % move, NOT annualized APY.
@@ -1377,20 +1393,31 @@ export function BucketDetailPage() {
 
               {/* Main 3-column section */}
               <div className="flex gap-4 w-full" style={{ minHeight: "60vh" }}>
-                {/* Left chart area (50%) */}
+                {/* Left chart area (50%) — Birdeye history-price chart for the
+                    highest-weighted asset in this bucket. */}
                 <div className="w-1/2">
-                  <div className={["h-full rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")}>
-                    <div className="h-full rounded-[1rem] border border-black/8 bg-[#f4f4f4] shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center gap-2">
-                      <p className="text-[14px] font-semibold text-[#6b7280] tracking-tight">Chart coming soon</p>
-                      {position && (
-                        <div className="text-[12px] text-[#9ca3af]">
-                          Your position: <span className="font-semibold text-[#374151]">
-                            {formatUsd(solToUsd(position.availableToWithdraw, solUsd))}
-                          </span>{" "}
-                          ({position.availableToWithdraw.toFixed(6)} SOL)
-                        </div>
-                      )}
-                    </div>
+                  <div className={["h-full rounded-[1.25rem] bg-[#f8f9f7] p-5 flex flex-col", panelShadow].join(" ")}>
+                    {topListing ? (
+                      <BirdeyeChart
+                        mint={topListing.assetId}
+                        symbol={topSymbol}
+                        iconUrl={topIcon}
+                        weightPct={topPct}
+                      />
+                    ) : (
+                      <div className="flex-1 rounded-[1rem] border border-black/8 bg-[#f4f4f4] shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] flex items-center justify-center">
+                        <p className="text-[13px] text-[#6b7280]">No assets in this bucket yet.</p>
+                      </div>
+                    )}
+                    {position && (
+                      <div className="mt-3 text-[12px] text-[#9ca3af]">
+                        Your position:{" "}
+                        <span className="font-semibold text-[#374151]">
+                          {formatUsd(solToUsd(position.availableToWithdraw, solUsd))}
+                        </span>{" "}
+                        ({position.availableToWithdraw.toFixed(6)} SOL)
+                      </div>
+                    )}
                   </div>
                 </div>
 
