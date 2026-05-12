@@ -57,7 +57,7 @@ export function MyBucketsPage() {
         onDisconnect={() => void logout()}
         user={layoutUser}
       >
-        <div className="max-w-2xl mx-auto p-8">
+        <div className="w-full px-5 pt-8 pb-16">
           <p className="text-[15px] text-[#6b7280] font-medium mb-4">Connect to list buckets you created.</p>
           <button
             type="button"
@@ -79,7 +79,7 @@ export function MyBucketsPage() {
       onDisconnect={() => void logout()}
       user={layoutUser}
     >
-      <div className="max-w-3xl mx-auto w-full p-8 pb-16 tracking-tight space-y-8">
+      <div className="w-full px-5 pt-8 pb-16 tracking-tight space-y-8">
         <CreatorVerificationStatus variant="banner" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-[14px] text-[#6b7280]">

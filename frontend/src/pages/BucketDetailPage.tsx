@@ -55,7 +55,7 @@ import {
   recommendSlippageForBasket,
   SLIPPAGE_PRESETS
 } from "../lib/slippage";
-import { displayTokenName, displayTokenSymbol } from "../lib/tokenLabels";
+import { displayTokenSymbol } from "../lib/tokenLabels";
 import { SOL_MINT, usePrices } from "../lib/usePrices";
 import { useTokenInfo } from "../lib/useTokenInfo";
 import { parseWalletError, WalletDeniedError } from "../lib/walletError";
@@ -1007,9 +1007,17 @@ export function BucketDetailPage() {
   const slippageTooLow = slippageBps < 10;
   const slippageHigh = slippageBps > 500;
 
-  /** Slippage selector block — used in both buy and sell columns. */
+  /** Slippage selector block — used in both buy and sell columns.
+   *  Visual language matches home.tsx + sidebar's "+ New bucket" button:
+   *  soft inset highlights, hairline ring border, layered outer drop shadow.
+   *  Warning lines use a tinted background instead of a colored border. */
   const slippageBlock = (
-    <div className="rounded-[10px] border border-black/8 bg-white/70 px-3 py-2.5 mt-3">
+    <div
+      className={[
+        "rounded-[12px] bg-[#f8f9f7] px-4 py-3 mt-3",
+        "shadow-[inset_0_1px_2px_rgba(255,255,255,0.95),inset_0_-1px_2px_rgba(255,255,255,0.4),0_0_0_1px_rgba(0,0,0,0.07),0_2px_6px_-2px_rgba(0,0,0,0.04)]"
+      ].join(" ")}
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-[11px] font-semibold text-[#374151] uppercase tracking-wider">Max slippage</span>
         <div className="flex items-center gap-1">
@@ -1020,18 +1028,22 @@ export function BucketDetailPage() {
             max={50}
             value={slippageInput}
             onChange={(e) => handleSlippageChange(e.target.value)}
-            className="w-[68px] px-2 py-1 rounded-[6px] border border-black/10 bg-white text-[12px] font-medium tabular-nums text-right"
+            className={[
+              "w-[68px] px-2 py-1 rounded-[8px] bg-white text-[12px] font-medium tabular-nums text-right outline-none",
+              "shadow-[inset_0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.08)]",
+              "focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.06),0_0_0_1.5px_rgba(0,0,0,0.22)]"
+            ].join(" ")}
             aria-label="Max slippage percent"
           />
           <span className="text-[11px] text-[#6b7280] font-semibold">%</span>
         </div>
       </div>
-      <p className="text-[11px] text-[#6b7280] leading-snug mb-2">
+      <p className="text-[11px] text-[#6b7280] leading-snug mb-2.5">
         Crypto prices move every few seconds — including while your trade is processing.{" "}
         <span className="text-[#374151] font-semibold">Too low</span> → trade cancelled.{" "}
         <span className="text-[#374151] font-semibold">Too high</span> → you may pay a bit more.
       </p>
-      <div className="flex flex-wrap gap-1 mb-1">
+      <div className="flex flex-wrap gap-2 mb-2">
         {SLIPPAGE_PRESETS.map((p) => {
           const active = slippageBps === p.bps;
           return (
@@ -1039,11 +1051,12 @@ export function BucketDetailPage() {
               key={p.tier}
               type="button"
               onClick={() => applySlippagePreset(p.bps)}
-              className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold transition-colors ${
+              className={[
+                "py-2 px-4 rounded-[10px] text-[12px] font-semibold transition-all active:scale-[0.98]",
                 active
-                  ? "bg-[#1a1c1e] text-white border-[#1a1c1e]"
-                  : "bg-white text-[#374151] border-black/10 hover:bg-black/[0.03]"
-              }`}
+                  ? "bg-[#1a1c1e] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_0_0_1px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.12)]"
+                  : "bg-[#f8f9f7] text-[#374151] hover:bg-white shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(255,255,255,0.5),0_0_0_1px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]"
+              ].join(" ")}
             >
               {p.label} {bpsToPercentString(p.bps)}%
             </button>
@@ -1053,7 +1066,11 @@ export function BucketDetailPage() {
           <button
             type="button"
             onClick={() => applySlippagePreset(slippageRecommendation.bps)}
-            className="px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 text-[10px] font-semibold hover:bg-emerald-100"
+            className={[
+              "py-2 px-4 rounded-[10px] text-[12px] font-semibold transition-all active:scale-[0.98]",
+              "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+              "shadow-[inset_0_2px_1px_rgba(255,255,255,0.7),inset_0_0_0_1px_rgba(255,255,255,0.4),0_0_0_1px_rgba(16,185,129,0.2),0_2px_4px_rgba(16,185,129,0.06)]"
+            ].join(" ")}
           >
             Use rec {bpsToPercentString(slippageRecommendation.bps)}%
           </button>
@@ -1063,12 +1080,12 @@ export function BucketDetailPage() {
         Recommended {bpsToPercentString(slippageRecommendation.bps)}% — {slippageRecommendation.reason}
       </p>
       {slippageTooLow && (
-        <p className="text-[10px] text-red-600 mt-1">
+        <p className="text-[11px] text-red-700 font-medium mt-2 px-2.5 py-1.5 rounded-[8px] bg-red-50">
           {bpsToPercentString(slippageBps)}% is very tight — your trade is likely to get cancelled. Try ≥ 0.10%.
         </p>
       )}
       {!slippageTooLow && slippageHigh && (
-        <p className="text-[10px] text-amber-700 mt-1">
+        <p className="text-[11px] text-amber-800 font-medium mt-2 px-2.5 py-1.5 rounded-[8px] bg-amber-50">
           {bpsToPercentString(slippageBps)}% is unusually wide — fill may be noticeably worse.
         </p>
       )}
@@ -1396,8 +1413,6 @@ export function BucketDetailPage() {
                           const info = tokenInfoMap[l.assetId] ?? null;
                           const rawSymbol = info?.symbol ?? asset?.symbol ?? l.assetId.slice(0, 6);
                           const symbol = displayTokenSymbol(l.assetId, rawSymbol) ?? rawSymbol;
-                          const rawName = info?.name ?? asset?.name ?? null;
-                          const name = displayTokenName(l.assetId, rawName);
                           const iconUrl = info?.iconUrl || asset?.iconUrl || "";
                           const pctNum = typeof l.percentage === "number" ? l.percentage : parseFloat(String(l.percentage));
                           const pct = Number.isFinite(pctNum) ? pctNum : 0;
@@ -1448,9 +1463,6 @@ export function BucketDetailPage() {
                                     {pct.toFixed(0)}%
                                   </span>
                                 </div>
-                                {name && name !== symbol && (
-                                  <div className="text-[10px] text-[#9ca3af] truncate">{name}</div>
-                                )}
                                 <div className="mt-1 h-2 rounded-full bg-black/5 shadow-[inset_0_1px_1px_rgba(0,0,0,0.06)] overflow-hidden">
                                   <div
                                     className="h-full rounded-full bg-[#1a1c1e]/20"
@@ -1474,14 +1486,25 @@ export function BucketDetailPage() {
                   <div className={["rounded-[1.25rem] bg-[#f8f9f7] p-5", panelShadow].join(" ")}>
                     <div className="flex items-center justify-between mb-3">
                       <h2 className="text-[14px] font-semibold text-[#374151] tracking-tight">Trade</h2>
-                      <div className="inline-flex rounded-[10px] bg-white border border-black/10 p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
+                      {/* Tabs use a single absolute pill that slides between the two
+                          buttons. The pill width is calc(50%-2px) so translate-x-full
+                          shifts it exactly onto the second button. */}
+                      <div className="relative inline-grid grid-cols-2 rounded-[10px] bg-white border border-black/10 p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
+                        <span
+                          aria-hidden
+                          className={[
+                            "absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-[8px] shadow-[0_1px_2px_rgba(0,0,0,0.15)]",
+                            "transition-[transform,background-color] duration-300 ease-out",
+                            tradeMode === "buy"
+                              ? "translate-x-0 bg-[#1a1c1e]"
+                              : "translate-x-full bg-[#374151]"
+                          ].join(" ")}
+                        />
                         <button
                           type="button"
                           onClick={() => setTradeMode("buy")}
-                          className={`px-3 py-1 rounded-[8px] text-[12px] font-semibold transition-colors ${
-                            tradeMode === "buy"
-                              ? "bg-[#1a1c1e] text-white shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
-                              : "text-[#6b7280] hover:text-[#1a1c1e]"
+                          className={`relative z-10 px-3 py-1 rounded-[8px] text-[12px] font-semibold transition-colors duration-300 ${
+                            tradeMode === "buy" ? "text-white" : "text-[#6b7280] hover:text-[#1a1c1e]"
                           }`}
                         >
                           Buy
@@ -1489,10 +1512,8 @@ export function BucketDetailPage() {
                         <button
                           type="button"
                           onClick={() => setTradeMode("sell")}
-                          className={`px-3 py-1 rounded-[8px] text-[12px] font-semibold transition-colors ${
-                            tradeMode === "sell"
-                              ? "bg-[#374151] text-white shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
-                              : "text-[#6b7280] hover:text-[#1a1c1e]"
+                          className={`relative z-10 px-3 py-1 rounded-[8px] text-[12px] font-semibold transition-colors duration-300 ${
+                            tradeMode === "sell" ? "text-white" : "text-[#6b7280] hover:text-[#1a1c1e]"
                           }`}
                         >
                           Sell
@@ -1529,7 +1550,11 @@ export function BucketDetailPage() {
                             type="button"
                             disabled={Boolean(busy) || buyBelowMin || !Number.isFinite(buySol) || buySol <= 0}
                             onClick={() => void buildJupiterBuyPlan()}
-                            className="px-3 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
+                            className={[
+                              "py-2 px-4 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold",
+                              "shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.06),0_0_0_1px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.15)]",
+                              "hover:bg-[#2a2c2e] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:bg-[#1a1c1e]"
+                            ].join(" ")}
                           >
                             Build
                           </button>
@@ -1541,7 +1566,13 @@ export function BucketDetailPage() {
                           )}
                         </p>
                         {minSwapSol > 0 && (
-                          <p className={`text-[11px] ${buyBelowMin ? "text-red-600" : "text-[#9ca3af]"}`}>
+                          <p
+                            className={
+                              buyBelowMin
+                                ? "text-[11px] font-medium text-red-700 px-2.5 py-1.5 rounded-lg bg-red-50"
+                                : "text-[11px] text-[#9ca3af]"
+                            }
+                          >
                             Min: {formatUsd(minSwapUsd)} ({minSwapSol.toFixed(4)} SOL)
                             {buyBelowMin && " — raise the amount"}
                           </p>
@@ -1576,7 +1607,11 @@ export function BucketDetailPage() {
                             type="button"
                             disabled={Boolean(busy) || sellOverMax || sellNonPositive || sellBelowMin}
                             onClick={() => void buildJupiterSellPlan()}
-                            className="px-3 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
+                            className={[
+                              "py-2 px-4 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold",
+                              "shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.06),0_0_0_1px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.15)]",
+                              "hover:bg-[#444851] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:bg-[#374151]"
+                            ].join(" ")}
                           >
                             Build
                           </button>
@@ -1592,12 +1627,14 @@ export function BucketDetailPage() {
                           ({sellAvailable.toFixed(4)} SOL)
                         </p>
                         {minSwapSol > 0 && sellBelowMin && (
-                          <p className="text-[11px] text-red-600">
+                          <p className="text-[11px] font-medium text-red-700 px-2.5 py-1.5 rounded-lg bg-red-50">
                             Min: {formatUsd(minSwapUsd)} ({minSwapSol.toFixed(4)} SOL)
                           </p>
                         )}
                         {sellOverMax && (
-                          <p className="text-[11px] text-red-600">Exceeds your available position.</p>
+                          <p className="text-[11px] font-medium text-red-700 px-2.5 py-1.5 rounded-lg bg-red-50">
+                            Exceeds your available position.
+                          </p>
                         )}
                         {slippageBlock}
                       </div>
@@ -1886,7 +1923,11 @@ export function BucketDetailPage() {
                           type="button"
                           disabled={Boolean(busy)}
                           onClick={() => void executeJupiterBuyPlan()}
-                          className="flex-1 px-4 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold disabled:opacity-50"
+                          className={[
+                            "flex-1 px-4 py-2 rounded-[10px] bg-[#1a1c1e] text-white text-[13px] font-semibold",
+                            "shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.06),0_0_0_1px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.15)]",
+                            "hover:bg-[#2a2c2e] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:bg-[#1a1c1e]"
+                          ].join(" ")}
                         >
                           Confirm &amp; Execute
                         </button>
@@ -1895,7 +1936,11 @@ export function BucketDetailPage() {
                           type="button"
                           disabled={Boolean(busy)}
                           onClick={() => void executeJupiterSellPlan()}
-                          className="flex-1 px-4 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold disabled:opacity-50"
+                          className={[
+                            "flex-1 px-4 py-2 rounded-[10px] bg-[#374151] text-white text-[13px] font-semibold",
+                            "shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.06),0_0_0_1px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.15)]",
+                            "hover:bg-[#444851] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:bg-[#374151]"
+                          ].join(" ")}
                         >
                           Confirm &amp; Execute
                         </button>
@@ -1904,7 +1949,11 @@ export function BucketDetailPage() {
                         type="button"
                         disabled={Boolean(busy)}
                         onClick={() => setPlanDialog(null)}
-                        className="px-4 py-2 rounded-[10px] bg-white border border-black/10 text-[#374151] text-[13px] font-semibold shadow-sm disabled:opacity-50"
+                        className={[
+                          "px-4 py-2 rounded-[10px] bg-[#f8f9f7] text-[#374151] text-[13px] font-semibold",
+                          "shadow-[inset_0_2px_1px_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(255,255,255,0.5),0_0_0_1px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]",
+                          "hover:bg-white active:scale-[0.98] transition-all disabled:opacity-50"
+                        ].join(" ")}
                       >
                         Cancel
                       </button>

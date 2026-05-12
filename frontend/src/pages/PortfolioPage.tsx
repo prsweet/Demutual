@@ -102,7 +102,7 @@ export function PortfolioPage() {
         onDisconnect={() => void logout()}
         user={layoutUser}
       >
-        <div className="max-w-2xl mx-auto p-8">
+        <div className="w-full px-5 pt-8 pb-16">
           <p className="text-[15px] text-[#6b7280] font-medium mb-4">Sign in to see deposits and ledger withdrawals.</p>
           <button
             type="button"
@@ -124,7 +124,7 @@ export function PortfolioPage() {
       onDisconnect={() => void logout()}
       user={layoutUser}
     >
-      <div className="max-w-4xl mx-auto w-full p-8 pb-16 tracking-tight space-y-8">
+      <div className="w-full px-5 pt-8 pb-16 tracking-tight space-y-8">
         {error && (
           <div className="flex items-start gap-2 rounded-[12px] border border-red-200/80 bg-red-50/80 px-3 py-2.5 text-[13px] font-medium text-red-800">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
