@@ -198,7 +198,7 @@ export function CreateBucketPage() {
       onDisconnect={() => void logout()}
       user={layoutUser}
     >
-      <div className="max-w-3xl mx-auto w-full p-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
+      <div className="w-full px-5 pt-8 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -209,7 +209,7 @@ export function CreateBucketPage() {
         </button>
 
         <div
-          className="bg-[#f8f9f7] rounded-3xl p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1),0_12px_24px_-4px_rgba(0,0,0,0.05),0_4px_8px_-2px_rgba(0,0,0,0.04)] space-y-10"
+          className="bg-[#f8f9f7] rounded-3xl p-8 shadow-[inset_0_3px_1px_rgba(255,255,255,1),inset_0_0_0_1.5px_rgba(255,255,255,0.8),0_0_0_1px_rgba(0,0,0,0.1)] space-y-10"
         >
           <div>
             <h1 className="text-[24px] font-semibold text-[#1a1c1e] tracking-tight mb-2">Create bucket</h1>
@@ -240,7 +240,7 @@ export function CreateBucketPage() {
                 placeholder="e.g. DeFi bluechips"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-black/10 rounded-[12px] text-[15px] font-medium text-[#1a1c1e] focus:outline-none focus:ring-2 focus:ring-black/5 shadow-sm placeholder:text-gray-400 transition-all"
+                className="w-full px-4 py-3 bg-white border border-black/10 rounded-[12px] text-[15px] font-medium text-[#1a1c1e] focus:outline-none focus:ring-2 focus:ring-black/5 placeholder:text-gray-400 transition-all"
               />
             </div>
 
@@ -251,7 +251,7 @@ export function CreateBucketPage() {
                 placeholder="Strategy, risk, and who this basket is for…"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-black/10 rounded-[12px] text-[15px] font-medium text-[#1a1c1e] focus:outline-none focus:ring-2 focus:ring-black/5 shadow-sm placeholder:text-gray-400 transition-all resize-none"
+                className="w-full px-4 py-3 bg-white border border-black/10 rounded-[12px] text-[15px] font-medium text-[#1a1c1e] focus:outline-none focus:ring-2 focus:ring-black/5 placeholder:text-gray-400 transition-all resize-none"
               />
             </div>
 
@@ -265,7 +265,7 @@ export function CreateBucketPage() {
                 step="0.01"
                 value={estimatedApy}
                 onChange={(e) => setEstimatedApy(e.target.value)}
-                className="w-full max-w-[200px] px-4 py-3 bg-white border border-black/10 rounded-[12px] text-[15px] font-medium text-[#1a1c1e] focus:outline-none focus:ring-2 focus:ring-black/5 shadow-sm tabular-nums"
+                className="w-full max-w-[200px] px-4 py-3 bg-white border border-black/10 rounded-[12px] text-[15px] font-medium text-[#1a1c1e] focus:outline-none focus:ring-2 focus:ring-black/5 tabular-nums"
               />
             </div>
           </div>
@@ -295,7 +295,7 @@ export function CreateBucketPage() {
           )}
 
           <div
-            className="rounded-2xl p-5 bg-white border border-black/8 shadow-[inset_0_2px_1px_rgba(255,255,255,0.9),0_2px_8px_rgba(0,0,0,0.04)] space-y-4"
+            className="rounded-2xl p-5 bg-white border border-black/8 shadow-[inset_0_2px_1px_rgba(255,255,255,0.9)] space-y-4"
           >
             <div className="flex items-center gap-2">
               <Plus className="w-4 h-4 text-[#6b7280]" />

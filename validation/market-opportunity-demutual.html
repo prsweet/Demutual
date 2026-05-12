@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Demutual — Market Opportunity & Validation Report</title>
+<style>
+  :root {
+    --bg: #f5f5f3;
+    --panel: #ffffff;
+    --ink: #111;
+    --mute: #6b7280;
+    --hair: rgba(0,0,0,0.08);
+    --green: #047857;
+    --amber: #b45309;
+    --red:   #b91c1c;
+    --blue:  #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; line-height: 1.55; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+  header { margin-bottom: 32px; }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .sub { color: var(--mute); font-size: 15px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 4px 10px; border-radius: 999px; margin-right: 6px; }
+  .tag.go { background: #d1fae5; color: var(--green); }
+  .tag.risk { background: #fef3c7; color: var(--amber); }
+  .tag.warn { background: #fee2e2; color: var(--red); }
+  .tag.info { background: #dbeafe; color: var(--blue); }
+  section { background: var(--panel); border: 1px solid var(--hair); border-radius: 16px; padding: 24px 28px; margin: 18px 0; }
+  section h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 14px; }
+  section h3 { font-size: 15px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14.5px; }
+  ul { padding-left: 22px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  th { font-weight: 700; color: var(--mute); text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; }
+  .score-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 10px 0 18px; }
+  .score { background: #fafaf9; border: 1px solid var(--hair); border-radius: 12px; padding: 14px 14px; }
+  .score .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mute); font-weight: 700; }
+  .score .val { font-size: 22px; font-weight: 700; margin-top: 6px; }
+  .score .of { color: var(--mute); font-weight: 500; font-size: 14px; }
+  .verdict { background: linear-gradient(135deg, #ecfdf5, #f0fdf4); border: 1px solid #a7f3d0; border-radius: 16px; padding: 22px 26px; }
+  .verdict h2 { color: var(--green); }
+  .kv { display: grid; grid-template-columns: 180px 1fr; row-gap: 8px; column-gap: 16px; font-size: 14px; }
+  .kv b { color: var(--mute); font-weight: 700; }
+  .risk-card { border-left: 3px solid var(--amber); padding: 10px 14px; background: #fffbeb; border-radius: 0 10px 10px 0; margin: 10px 0; }
+  .risk-card.high { border-left-color: var(--red); background: #fef2f2; }
+  .risk-card .sev { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+  .risk-card.high .sev { color: var(--red); }
+  .risk-card .sev { color: var(--amber); }
+  small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--mute); font-size: 12px; }
+  .footer { margin-top: 28px; color: var(--mute); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="tag go">VERDICT: GO</span>
+  <span class="tag info">Confidence 0.7</span>
+  <span class="tag risk">Score 10 / 15</span>
+  <h1 style="margin-top:12px">Demutual — Market Opportunity</h1>
+  <div class="sub">Decentralized mutual funds on Solana · validation sprint output · <small class="mono">2026-05-12</small></div>
+</header>
+
+<section class="verdict">
+  <h2>Verdict: GO — ship the hackathon submission, fix position drift, recruit named curators</h2>
+  <p>The MVP is already running end-to-end on Jupiter mainnet. The market exists (Symmetry's prior traction proves it), TradFi tailwinds favor on-chain funds, and the product has two real wedges over Symmetry (UX + research-locked-on-publish). The dominant risk is Jupiter absorbing the category as a feature — mitigate by becoming the <em>curator marketplace</em> layer, not the swap layer.</p>
+</section>
+
+<section>
+  <h2>Scorecard</h2>
+  <div class="score-grid">
+    <div class="score"><div class="label">Founder fit</div><div class="val">2 <span class="of">/ 3</span></div></div>
+    <div class="score"><div class="label">MVP speed</div><div class="val">3 <span class="of">/ 3</span></div></div>
+    <div class="score"><div class="label">Distribution</div><div class="val">1 <span class="of">/ 3</span></div></div>
+    <div class="score"><div class="label">Market pull</div><div class="val">2 <span class="of">/ 3</span></div></div>
+    <div class="score"><div class="label">Revenue</div><div class="val">2 <span class="of">/ 3</span></div></div>
+  </div>
+  <div class="kv">
+    <b>Demand signal score</b><div>2 / 3 — moderate (multiple strong signals from independent sources, no single user-pull artifact yet)</div>
+    <b>Competition level</b><div>Moderate — 1 direct (Symmetry), several adjacent (Sanctum LST baskets, dHEDGE on EVM, Index Coop)</div>
+    <b>Technical feasibility</b><div>Straightforward — Jupiter handles routing, all on-chain primitives exist</div>
+    <b>Time to MVP</b><div>Shipped (MVP exists)</div>
+    <b>Crypto necessity</b><div>Medium — composability + permissionless creation are real, but a CEX index fund delivers similar user-side utility off-chain</div>
+  </div>
+</section>
+
+<section>
+  <h2>Demand signals</h2>
+  <h3>Strong</h3>
+  <ul>
+    <li><b>Sanctum LST aggregation</b> — rising TVL proves SOL-denominated basket demand. Users are voting with capital for "diversified SOL exposure".</li>
+    <li><b>Jupiter Spot Trade multi-asset flows</b> — the biggest aggregator is moving toward curator-basket UX. Independent validation; also the biggest threat (see risks).</li>
+    <li><b>TradFi normalization</b> — BlackRock BUIDL, Franklin Templeton FOBXX, Bitwise on-chain indices. The "tokenized fund" narrative is mainstream.</li>
+    <li><b>Symmetry exists with moderate TVL</b> — proves curator baskets on Solana are buildable and that some demand has shown up; the niche is not solved.</li>
+    <li><b>Perennial CT threads</b> — "where's the Solana index fund?" is asked repeatedly. Unmet desire, not a one-off vibe.</li>
+  </ul>
+  <h3>Weak (do not lean on these alone)</h3>
+  <ul>
+    <li>"I'd buy that" replies in DMs.</li>
+    <li>VC interest in RWA / DeFi narratives.</li>
+    <li>Hackathon track money for DeFi categories.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Competitive landscape</h2>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Chain</th><th>Status</th><th>Strength</th><th>Weakness vs Demutual</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Symmetry</b></td><td>Solana</td><td>Live</td>
+        <td>First-mover on curator baskets; ecosystem mindshare</td>
+        <td>Power-user UX (no USD-first investor framing); no research-doc-locked-on-publish</td>
+      </tr>
+      <tr>
+        <td><b>Sanctum</b></td><td>Solana</td><td>Live, growing</td>
+        <td>Strong LST aggregation; sticky users</td>
+        <td>LST-only — not general curator baskets. Adjacent, not direct.</td>
+      </tr>
+      <tr>
+        <td><b>Jupiter (Spot Trade)</b></td><td>Solana</td><td>Live</td>
+        <td>Owns routing + distribution + user attention</td>
+        <td>Not a curator marketplace today — but could become one. Biggest absorption risk.</td>
+      </tr>
+      <tr>
+        <td><b>dHEDGE</b></td><td>Polygon/Optimism</td><td>Live</td>
+        <td>Social-trader vaults — closest conceptual analog</td>
+        <td>Wrong chain; EVM gas friction; performance fees are punitive (15%+)</td>
+      </tr>
+      <tr>
+        <td><b>Index Coop (DPI, BED, MVI)</b></td><td>Ethereum/L2</td><td>Live</td>
+        <td>Institutional-grade indices; long track record</td>
+        <td>Committee-curated, not permissionless. High mint/redeem fees on L1.</td>
+      </tr>
+      <tr>
+        <td><b>Sommelier</b></td><td>Cosmos/EVM</td><td>Live</td>
+        <td>Curator-led strategies with off-chain compute</td>
+        <td>Heavy infra; not Solana-native</td>
+      </tr>
+      <tr>
+        <td><b>Set Protocol / TokenSets</b></td><td>Ethereum</td><td>Dead (consumer app)</td>
+        <td>—</td>
+        <td>Died from EVM gas + retail confusion. Landmine: do not over-engineer creator tools at the cost of investor simplicity.</td>
+      </tr>
+      <tr>
+        <td><b>Yearn Vaults</b></td><td>Ethereum/L2</td><td>Live</td>
+        <td>Automated yield aggregation</td>
+        <td>Different value-prop (yield, not exposure). Substitute, not competitor.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin-top:12px"><b>Substitutes (how users solve this without Demutual today):</b> buy individual SPL tokens via Jupiter; DCA into single SOL or stablecoin; CEX-curated index (Bitwise on Coinbase); TradFi sector ETFs entirely off-chain.</p>
+  <p><b>Crowdedness:</b> <i>moderate</i> — 1 direct competitor, several substitutes, one major absorption threat.</p>
+</section>
+
+<section>
+  <h2>Risks</h2>
+  <div class="risk-card high">
+    <div class="sev">High · Market</div>
+    <p><b>Jupiter absorbs the category.</b> The biggest aggregator on Solana could ship a first-party curator-basket UX. Demutual's distribution moat would collapse overnight.<br><b>Mitigation:</b> position Demutual as the curator marketplace <em>on top of</em> Jupiter, not the swap layer. The integration-first architecture is already correct — make it explicit in positioning.</p>
+  </div>
+  <div class="risk-card high">
+    <div class="sev">High · Market</div>
+    <p><b>Symmetry already occupies the niche.</b> Differentiation must be sharp.<br><b>Mitigation:</b> three real wedges — (1) USD-first investor UX, (2) generous creator fee (0.4%) vs Symmetry's lower split, (3) research-doc-locked-on-publish (transparency moat — investors read exactly what was in front of earlier buyers).</p>
+  </div>
+  <div class="risk-card high">
+    <div class="sev">High · Distribution</div>
+    <p><b>Two-sided cold start.</b> Investors won't show up without credible curators; curators won't bother without an investor audience.<br><b>Mitigation:</b> hand-recruit 5-10 named curators with existing audiences (KOLs, ex-quant traders, sector analysts) <em>before</em> general launch. Each comes with their own demand.</p>
+  </div>
+  <div class="risk-card">
+    <div class="sev">Medium · Regulatory</div>
+    <p>Curated portfolios + fees look fund-like to US regulators. Non-custodial architecture (Demutual never holds investor assets) reduces exposure. Creator-side legal status in restrictive jurisdictions is unclear.<br><b>Mitigation:</b> publish a clear "not investment advice / non-custodial" disclaimer; geofence US for the first cycle if needed.</p>
+  </div>
+  <div class="risk-card">
+    <div class="sev">Medium · Technical</div>
+    <p><b>Position drift.</b> <code>availableToWithdraw</code> is derived from ledger (totalDeposited − totalWithdrawn) and can diverge from actual on-chain SPL balances if a user moves tokens outside Demutual. Already a known follow-up.<br><b>Mitigation:</b> server-side fix already scoped — read user's actual SPL balances and return min(ledger claim, on-chain reality). Pure server change; no custodial risk added.</p>
+  </div>
+  <div class="risk-card">
+    <div class="sev">Medium · Team</div>
+    <p>Hackathon stage. For fund-like products, track record is the credibility currency. Need wins on the board fast.<br><b>Mitigation:</b> ship a public basket performance leaderboard; let on-chain history compound into the moat.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Crypto-necessity gut check</h2>
+  <p><i>"What breaks if you remove the blockchain?"</i></p>
+  <ul>
+    <li><b>Auditable allocation history</b> — breaks. Cannot prove a curator didn't change weights after the fact.</li>
+    <li><b>Permissionless curator creation</b> — breaks. Off-chain version requires licensing or central approval.</li>
+    <li><b>Composability with other DeFi</b> — breaks. The basket holdings are SPL tokens in investor wallets; other protocols can read or interact.</li>
+    <li><b>Non-custodial trust model</b> — breaks. Without the chain, investors hand assets to a curator, recreating the TradFi trust problem Demutual is meant to dissolve.</li>
+  </ul>
+  <p><b>Verdict:</b> crypto is <i>load-bearing</i> for the moat (permissionless creation, transparent history, non-custodial). It is <i>ornamental</i> for the day-to-day UX, which is intentional — the investor flow looks like buying any other product. That's the right design.</p>
+</section>
+
+<section>
+  <h2>Recommended differentiation wedge</h2>
+  <p><b>"The transparent curator marketplace."</b></p>
+  <p>Demutual's research-doc-locked-on-publish is the unique angle nobody else has. Symmetry doesn't have it. Jupiter, even if they ship baskets, won't have it because they're a routing layer, not a curator marketplace. The thesis: <i>investors want to understand WHY a basket is composed the way it is, written before any returns existed</i>. Bind creators to their pre-investment thesis on-chain.</p>
+  <p>Two-sided UX policy backs this up: investor side hand-held (USD-first, plain-language slippage, partial-fill resumability already implemented). Creator side intentionally lighter-touch — that's the quality filter that prevents spam baskets.</p>
+</section>
+
+<section>
+  <h2>Next steps (in order)</h2>
+  <ol>
+    <li><b>Ship the position-drift fix.</b> Server reads on-chain SPL balances, returns <code>min(ledger, on-chain)</code> for <code>availableToWithdraw</code>. Unblocks sell-side reliability.</li>
+    <li><b>Recruit 5-10 named curator creators</b> before general launch. KOLs, ex-quant traders, sector analysts. Each brings their own audience. Solves cold-start.</li>
+    <li><b>Pick canonical wedges, not a flood.</b> One "Liquid Staking Index", one "Solana DeFi Bluechip", one "Memecoin index". Quality over quantity.</li>
+    <li><b>Sharpen positioning vs Symmetry</b> on UX, creator economics, and research-locked-on-publish. Three sentences on the homepage; everywhere else, just be better.</li>
+    <li><b>Monitor Jupiter's roadmap.</b> If they announce baskets, pivot to "creator tools on top of Jupiter" — be the marketplace layer, not the swap layer.</li>
+    <li><b>Hold the integration-first line.</b> No custom AMM, no custom vault contract. Jupiter for routing, off-the-shelf SPL primitives. Resist the temptation to write a custom program just for depth signaling.</li>
+    <li><b>Get the hackathon submission live.</b> Partial-fill resumability + research-locked-on-publish + plain-language UX are demo-strong differentiators.</li>
+  </ol>
+</section>
+
+<div class="footer">
+  Generated by the <code>validate-idea</code> skill from solana.new · framework: validation-framework.md / customer-signal-rubric.md / pivot-or-persist.md
+</div>
+
+</div>
+</body>
+</html>
