@@ -19,7 +19,10 @@ export function getApiBaseUrl(): string {
   const fromMeta =
     typeof import.meta !== "undefined" &&
     (import.meta as ImportMeta & { env?: Record<string, string> }).env?.BUN_PUBLIC_API_URL;
-  return (fromMeta || "https://demutual-production.up.railway.app").replace(/\/$/, "");
+  // @ts-ignore
+  const fromProcess = typeof process !== "undefined" && process.env ? process.env.BUN_PUBLIC_API_URL : undefined;
+  
+  return (fromMeta || fromProcess || "http://localhost:3000").replace(/\/$/, "");
 }
 
 export const api: AxiosInstance = axios.create({

@@ -12,7 +12,7 @@ import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestFeeBundle } from "../investTxVerify";
 import { toJsonSafe } from "../jsonSafe";
 import { checkFeeRecipientsRentSafe, estimateMissingAtaRentLamports } from "../services/ataRent";
-import { jupiterExecute, jupiterOrder, WSOL_MINT } from "../services/jupiterSwap";
+import { jupiterExecute, jupiterOrder, jupiterQuote, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
   type jupiterAttemptResumeSchema,
@@ -165,12 +165,14 @@ const buildJupiterPlan = async ({
       }
 
       try {
+        // Use order endpoint in previewMode so it doesn't fail if the user's wallet doesn't hold tokens yet
         const order = await jupiterOrder({
           inputMint: WSOL_MINT,
           outputMint: outMint,
           amountLamports: lamports,
           slippageBps,
-          taker: user.walletAddress
+          taker: user.walletAddress,
+          previewMode: true
         });
         legs.push({
           kind: "swap",
@@ -180,8 +182,8 @@ const buildJupiterPlan = async ({
           inputLamports: lamports,
           expectedOutAmount: order.outAmount,
           minimumOutAmount: order.otherAmountThreshold || "0",
-          swapTransactionBase64: order.transaction,
-          requestId: order.requestId
+          swapTransactionBase64: "", // Not needed for preview
+          requestId: ""
         });
 
         // Delay to avoid Jupiter 429 rate limit on free tier

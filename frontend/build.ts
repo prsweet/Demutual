@@ -131,6 +131,9 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
+    "import.meta.env.BUN_PUBLIC_API_URL": JSON.stringify(process.env.BUN_PUBLIC_API_URL || "http://localhost:3000"),
+    "import.meta.env.BUN_PUBLIC_SOLANA_RPC_URL": JSON.stringify(process.env.BUN_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com"),
+    "import.meta.env.BUN_PUBLIC_SOLANA_JUPITER_RPC_URL": JSON.stringify(process.env.BUN_PUBLIC_SOLANA_JUPITER_RPC_URL || "https://api.mainnet-beta.solana.com"),
   },
   ...cliConfig,
 });

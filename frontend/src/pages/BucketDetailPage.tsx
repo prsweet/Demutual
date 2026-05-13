@@ -158,8 +158,8 @@ export function BucketDetailPage() {
 
   const [treasuryInput, setTreasuryInput] = useState("");
   const [investSol, setInvestSol] = useState("0.01");
-  const [jupiterSol, setJupiterSol] = useState("0.01");
-  const [sellSol, setSellSol] = useState("0.01");
+  const [jupiterUsd, setJupiterUsd] = useState("10");
+  const [sellUsd, setSellUsd] = useState("10");
   const [jupiterBuyPlan, setJupiterBuyPlan] = useState<Awaited<ReturnType<typeof postJupiterInvestPlan>> | null>(null);
   const [jupiterSellPlan, setJupiterSellPlan] = useState<Awaited<ReturnType<typeof postJupiterSellPlan>> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -480,8 +480,13 @@ export function BucketDetailPage() {
       setError("Connected wallet must match login.");
       return;
     }
-    const amount = parseFloat(jupiterSol);
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    const usdAmount = parseFloat(jupiterUsd);
+    if (!Number.isFinite(usdAmount) || usdAmount <= 0) return;
+    if (!solUsd) {
+      setError("Waiting for live SOL price...");
+      return;
+    }
+    const amount = usdAmount / solUsd;
 
     setBusy("Building Jupiter plan…");
     setError(null);
@@ -504,7 +509,13 @@ export function BucketDetailPage() {
     if (!provider || !walletAddr) return;
 
     const plan = jupiterBuyPlan;
-    const amount = parseFloat(jupiterSol);
+    const usdAmount = parseFloat(jupiterUsd);
+    if (!Number.isFinite(usdAmount) || usdAmount <= 0) return;
+    if (!solUsd) {
+      setError("Waiting for live SOL price...");
+      return;
+    }
+    const amount = usdAmount / solUsd;
 
     setBusy("Initializing execution…");
     setError(null);
@@ -753,8 +764,13 @@ export function BucketDetailPage() {
       setError("Connected wallet must match login.");
       return;
     }
-    const amount = parseFloat(sellSol);
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    const usdAmount = parseFloat(sellUsd);
+    if (!Number.isFinite(usdAmount) || usdAmount <= 0) return;
+    if (!solUsd) {
+      setError("Waiting for live SOL price...");
+      return;
+    }
+    const amount = usdAmount / solUsd;
 
     setBusy("Building sell plan…");
     setError(null);
@@ -1177,14 +1193,16 @@ export function BucketDetailPage() {
           const plan = planDialog?.kind === "sell" ? jupiterSellPlan : jupiterBuyPlan;
 
           // Buy-side derived values for the panel
-          const buySol = parseFloat(jupiterSol);
-          const buyUsd = Number.isFinite(buySol) ? solToUsd(buySol, solUsd) : null;
+          const buyUsdParsed = parseFloat(jupiterUsd);
+          const buySol = Number.isFinite(buyUsdParsed) && solUsd ? buyUsdParsed / solUsd : 0;
+          const buyUsd = Number.isFinite(buyUsdParsed) ? formatUsd(buyUsdParsed) : null;
           const buyBelowMin =
-            Number.isFinite(buySol) && buySol > 0 && minSwapSol > 0 && buySol < minSwapSol;
+            buySol > 0 && minSwapSol > 0 && buySol < minSwapSol;
 
           // Sell-side derived values for the panel
-          const sellParsed = parseFloat(sellSol);
-          const sellUsd = Number.isFinite(sellParsed) ? solToUsd(sellParsed, solUsd) : null;
+          const sellUsdParsed = parseFloat(sellUsd);
+          const sellParsed = Number.isFinite(sellUsdParsed) && solUsd ? sellUsdParsed / solUsd : 0;
+          const sellUsdFormatted = Number.isFinite(sellUsdParsed) ? formatUsd(sellUsdParsed) : null;
           const sellAvailable = position?.availableToWithdraw ?? 0;
           const sellAvailableUsd = solToUsd(sellAvailable, solUsd);
           const sellOverMax = Number.isFinite(sellParsed) && sellParsed > sellAvailable + 1e-9;
@@ -1593,17 +1611,17 @@ export function BucketDetailPage() {
                     ) : tradeMode === "buy" ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
+                          <span className="text-[#6b7280] font-semibold">$</span>
                           <input
                             type="number"
                             step="any"
-                            min={minSwapSol || 0}
-                            value={jupiterSol}
+                            value={jupiterUsd}
                             onChange={(e) => {
-                              setJupiterSol(e.target.value);
+                              setJupiterUsd(e.target.value);
                               setJupiterBuyPlan(null);
                             }}
                             className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
-                            placeholder="SOL"
+                            placeholder="USD Amount"
                           />
                           <button
                             type="button"
@@ -1641,22 +1659,21 @@ export function BucketDetailPage() {
                     ) : (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
+                          <span className="text-[#6b7280] font-semibold">$</span>
                           <input
                             type="number"
                             step="any"
-                            min={minSwapSol || 0}
-                            max={sellAvailable}
-                            value={sellSol}
+                            value={sellUsd}
                             onChange={(e) => {
-                              setSellSol(e.target.value);
+                              setSellUsd(e.target.value);
                               setJupiterSellPlan(null);
                             }}
                             className="flex-1 px-3 py-2 rounded-[10px] border border-black/10 bg-white text-[13px] tabular-nums"
-                            placeholder="SOL out"
+                            placeholder="USD out"
                           />
                           <button
                             type="button"
-                            onClick={() => setSellSol(String(sellAvailable))}
+                            onClick={() => setSellUsd(sellAvailableUsd ? String(solToUsd(sellAvailable, solUsd ?? 0)) : "0")}
                             disabled={sellAvailable <= 0}
                             className="px-2 py-2 rounded-[10px] border border-black/10 bg-white text-[11px] font-semibold text-[#374151] disabled:opacity-50"
                           >

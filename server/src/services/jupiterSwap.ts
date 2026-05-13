@@ -129,6 +129,7 @@ export async function jupiterOrder(params: {
   slippageBps: number;
   swapMode?: "ExactIn" | "ExactOut";
   taker: string;
+  previewMode?: boolean;
 }): Promise<{ transaction: string; requestId: string; outAmount: string; otherAmountThreshold?: string }> {
   const u = new URL(`${jupiterHost()}/swap/v2/order`);
   u.searchParams.set("inputMint", params.inputMint);
@@ -137,11 +138,7 @@ export async function jupiterOrder(params: {
   u.searchParams.set("slippageBps", String(params.slippageBps));
   if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
   u.searchParams.set("taker", params.taker);
-  // ExactOut quotes have historically had the highest rate of "winning quote has no
-  // transaction" responses — the JupiterZ / RFQ router accepts the quote but can't
-  // build the swap. Setting `payer` forces the routing pool to Metis-only (per Jupiter
-  // gasless docs), which reliably returns a signable transaction. The taker still pays;
-  // we just lock the router selection.
+  
   if (params.swapMode === "ExactOut") {
     u.searchParams.set("payer", params.taker);
   }
@@ -167,10 +164,6 @@ export async function jupiterOrder(params: {
     }
     throw new Error(`JUPITER_ORDER_HTTP_${res.status}: ${t.slice(0, 400)}`);
   }
-  // Jupiter v2 /order can return 200 OK with no `transaction` field — typically when the
-  // router built a quote but the taker's wallet doesn't actually hold the input asset
-  // ("Insufficient funds" on ExactOut), or when JupiterZ/RFQ accepted the quote but
-  // can't commit a swap. Distinguish the two so the FE shows the right friendly message.
   const data = (await res.json()) as {
     transaction?: unknown;
     requestId?: unknown;
@@ -181,7 +174,19 @@ export async function jupiterOrder(params: {
   };
   const tx = typeof data.transaction === "string" ? data.transaction : "";
   const reqId = typeof data.requestId === "string" ? data.requestId : "";
+  
   if (!tx || !reqId) {
+    // If previewMode is true, we don't care if Jupiter couldn't build the transaction
+    // due to insufficient funds; we just want the outAmount.
+    if (params.previewMode) {
+      return {
+        transaction: "",
+        requestId: "",
+        outAmount: typeof data.outAmount === "string" ? data.outAmount : "0",
+        ...(typeof data.otherAmountThreshold === "string" ? { otherAmountThreshold: data.otherAmountThreshold } : {})
+      };
+    }
+
     const jupErr = typeof data.error === "string" ? data.error : "";
     const lower = jupErr.toLowerCase();
     if (lower.includes("insufficient")) {

@@ -10,7 +10,7 @@ import {
 import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestFeeBundle } from "../investTxVerify";
 import { toJsonSafe } from "../jsonSafe";
-import { jupiterGetQuote, jupiterOrder, jupiterPostSwap, WSOL_MINT } from "../services/jupiterSwap";
+import { jupiterGetQuote, jupiterOrder, jupiterPostSwap, jupiterQuote, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
   type jupiterAttemptResumeSchema,
@@ -194,14 +194,33 @@ const buildJupiterSellPlan = async ({
       const legRow = attempt.legs[i]!;
       const slot = swapSlots.find((s) => s.inMint === legRow.mint)!;
       try {
-        const order = await jupiterOrder({
-          inputMint: legRow.mint,
-          outputMint: WSOL_MINT,
-          amountLamports: Number(legRow.lamports),
-          slippageBps,
-          swapMode: "ExactOut",
-          taker: user.walletAddress
-        });
+        let expectedOut = "0";
+        let transactionBase64 = "";
+        let reqId = "";
+        
+        try {
+          const order = await jupiterOrder({
+            inputMint: legRow.mint,
+            outputMint: WSOL_MINT,
+            amountLamports: Number(legRow.lamports),
+            slippageBps,
+            swapMode: "ExactOut",
+            taker: user.walletAddress,
+            previewMode: true
+          });
+          expectedOut = order.otherAmountThreshold || "?"; // For ExactOut, otherAmountThreshold is max inAmount
+          transactionBase64 = order.transaction;
+          reqId = order.requestId;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.startsWith("JUPITER_TAKER_INSUFFICIENT_FUNDS")) {
+            // Should not happen anymore with previewMode, but handle just in case
+            expectedOut = "?";
+          } else {
+            throw e;
+          }
+        }
+
         legs.push({
           kind: "swap",
           legId: legRow.id,
@@ -209,9 +228,9 @@ const buildJupiterSellPlan = async ({
           symbol: slot.symbol,
           percentage: slot.percentage,
           outputLamports: Number(legRow.lamports),
-          estInputAmount: order.otherAmountThreshold || "?", // For ExactOut, otherAmountThreshold is max inAmount
-          swapTransactionBase64: order.transaction,
-          requestId: order.requestId
+          estInputAmount: expectedOut,
+          swapTransactionBase64: transactionBase64,
+          requestId: reqId
         });
         if (i < attempt.legs.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 600));
