@@ -12,19 +12,17 @@ Because we route highly fragmented, multi-token liquidity, we are extreme power-
 
 ## 2. API Performance: Critical Bugs & Edge Cases Found
 
-During our deep integration testing, we encountered two significant edge cases in the new V2 infrastructure that degrade the developer experience:
+During our deep integration testing, we encountered two significant edge cases in the new V2 infrastructure that degrade the developer experience. Here is our direct feedback for the engineering team:
 
-### A. V2 `/order` endpoint swallows validation errors (500 vs 400)
-When building our token catalog, we accidentally included an invalid/deprecated mint address for Drift Staked SOL (dSOL). 
-*   **V1 Behavior:** When querying the legacy `/swap/v1/quote`, Jupiter correctly and gracefully handled the bad mint, returning a `400 Bad Request` with a highly descriptive error: `{"error":"The token [Mint] is not tradable","errorCode":"TOKEN_NOT_TRADABLE"}`. This made debugging instant.
-*   **V2 Behavior (Bug):** When we migrated to the V2 Meta-Aggregator and hit `/swap/v2/order` with the exact same bad mint, the Jupiter server internally crashed. It returned a `500 Internal Server Error` with a completely opaque message: `{"error":"Something unexpected occurred"}`. 
-*   **Impact:** Developers migrating to V2 lose critical validation debugging data. V2 should inherit the exact validation error schemas from V1.
+### Feedback A: The 500 Internal Server Error Bug on `/swap/v2/order`
+**The Issue:** When you pass an invalid, deprecated, or non-existent token mint address to the new V2 `/order` endpoint, Jupiter internally crashes.
+*   **V1 Behavior:** `GET /swap/v1/quote` correctly returns a `400 Bad Request` with `{ "error": "The token is not tradable", "errorCode": "TOKEN_NOT_TRADABLE" }`. This made debugging instant.
+*   **V2 Behavior:** `GET /swap/v2/order` completely swallows the validation error and returns an opaque `500 Internal Server Error: {"error":"Something unexpected occurred"}`. 
+**The Request:** V2 must inherit the exact validation error schemas from V1. When debugging our token catalog, a 500 error gives us absolutely zero indication that the mint address is the problem.
 
-### B. Tokens API V2 returns deprecated/broken CDN links
-When attempting to dynamically fetch verified token metadata to render our marketplace UI, we utilized `https://api.jup.ag/tokens/v2/tag?query=verified`.
-*   **The Issue:** Many blue-chip tokens (including SOL, USDC, and JitoSOL) returned `icon` URLs pointing to `raw.githubusercontent.com/solana-labs/token-list/...`. Because the Solana Foundation deprecated and archived that repository, those images 404 in production web apps.
-*   **The Reality:** The `icon` field isn't a guaranteed, Jupiter-hosted CDN link; it simply reflects whatever the token submitter registered.
-*   **The Fix Required:** Jupiter should ideally proxy and cache these images on a Jupiter-owned CDN (e.g., `static.jup.ag`), or at the very least, run a dead-link crawler to update the metadata for top-100 verified tokens. We had to build a custom fallback mechanism using CoinGecko's API just to get working SVG/PNG links.
+### Feedback B: Token Metadata (V2 Tokens API)
+**The Issue:** When fetching verified token data from `https://api.jup.ag/tokens/v2/tag?query=verified`, dozens of top-tier tokens (SOL, USDC, JitoSOL) return `icon` URLs pointing to `raw.githubusercontent.com/solana-labs/token-list/...`. 
+**The Request:** Because the Solana Foundation archived that repository, those images `404` in production environments. Jupiter should actively proxy, cache, or automatically update the icon URLs for the top 100 most-traded tokens to point to a stable CDN, rather than relying on legacy, dead GitHub links submitted years ago. We had to build a custom fallback mechanism using CoinGecko's API just to get working SVG/PNG links.
 
 ---
 
@@ -33,10 +31,9 @@ When attempting to dynamically fetch verified token metadata to render our marke
 ### The Good: `llms.txt` is a Game Changer
 We utilized an AI coding agent to assist with our backend migration. The inclusion of `https://dev.jup.ag/docs/llms.txt` is a masterclass in modern developer onboarding. By feeding this index directly into our agent, it instantly understood the architectural dichotomy between the **Meta-Aggregator** (`/order` & `/execute`) and the **Router** (`/build` & `/submit`). The agent successfully drafted our migration plan in under 5 minutes without us manually reading a single page.
 
-### The Missing: Rate Limit Clarity for Complex Arbitrage
-Demutual executes multi-leg basket swaps. If a basket has 5 tokens, we must fetch 5 quotes simultaneously.
-*   On the free public API tier, firing 5 concurrent `/order` requests via `Promise.all` immediately triggers a `429 Too Many Requests` block (`{"code":429,"message":"[API Gateway] Too many requests"}`).
-*   **Documentation Gap:** The docs do not clearly explicitly state the burst/concurrency limits for the free tier. We had to trial-and-error a `600ms` sequential delay between `/order` requests to bypass the WAF. A clear table detailing exact RPS/Burst limits per tier would save developers hours of debugging.
+### Feedback C: Lack of Explicit Rate Limit Documentation
+**The Issue:** Demutual executes multi-token basket swaps (e.g., buying 5 tokens simultaneously). Firing concurrent `/order` requests immediately triggers a `429 Too Many Requests` block on the public tier.
+**The Request:** The official documentation explicitly mentions that `/execute` has a dedicated rate limit bucket, but it fails to define the exact RPS or burst limits for the `/order` endpoint on the free tier. Developers are forced to trial-and-error arbitrary sleep loops (e.g., `setTimeout(resolve, 600)`) to bypass the Web Application Firewall (WAF). A simple table mapping "Tier -> `/order` Burst Limits" is required.
 
 ---
 
@@ -56,5 +53,11 @@ Since we were forced to have users sign multiple transactions anyway, the Meta-A
 
 ## 5. Strategic Improvements & Feature Requests
 
-1.  **Bundled Basket Endpoint:** Currently, building a mutual fund app requires N API calls for N tokens. Jupiter should introduce a `/v2/basket` endpoint where a developer submits an input mint and an array of output mints + weights. Jupiter's engine could optimize the routing collectively and return an array of optimized transactions, drastically reducing API overhead for portfolio management protocols.
-2.  **Explicit RFQ Flag:** In the `/order` response, provide a boolean `isRfqRoute: true`. Since RFQ routes cannot be simulated locally by wallets (like Backpack) without throwing a "Transaction failed simulation" error, knowing this flag in advance would allow developers to show a clean warning UI to the user: *"This route uses off-chain liquidity. Your wallet simulation may fail, but execution is safe."*
+### Feedback D: Clarification on Wallet “Failed Simulation” Errors
+**The Issue:** When a user is routed through JupiterZ (RFQ), the transaction sent to their wallet is missing the market maker’s final signature. Consequently, wallets like Backpack throw a highly alarming, bright red warning: *“Transaction failed simulation. No balance changes detected.”* 
+**The Request:**
+1. The documentation needs a massive, bold callout on the `/order` page explicitly explaining that RFQ routes will cause local wallet simulations to fail, but that execution via `/execute` is still safe.
+2. **Explicit RFQ Flag (`isRfqRoute: boolean`):** We desperately need an `isRfqRoute: boolean` flag returned in the `/order` JSON payload. If we have this flag, we can dynamically render a warning in our own frontend UI *before* the wallet pops up, assuring the user that the red error is expected and safe to bypass.
+
+### Feature Request: Bundled Basket Endpoint (`/v2/basket`)
+Currently, building a mutual fund app requires $N$ API calls for $N$ tokens. Jupiter should introduce an endpoint where a developer submits an input mint and an array of output mints + weights. Jupiter's engine could optimize the routing collectively and return an array of optimized transactions, drastically reducing API overhead and eliminating 429 errors for portfolio management protocols.
