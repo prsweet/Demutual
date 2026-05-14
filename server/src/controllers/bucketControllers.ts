@@ -220,10 +220,10 @@ const investInBucket = async ({
             transactionSignature: sig
           }
         });
-        const bucketUpdate = await tx.bucket.update({
-          where: { id: bucket.id },
-          data: { tvl: Number(bucket.tvl) + net }
-        });
+const bucketUpdate = await tx.bucket.update({
+           where: { id: bucket.id },
+           data: { tvl: { increment: net } }
+         });
         return { deposit, bucketUpdate, gross, feeTotal, feeCreator, feePlatform, net };
       });
 
@@ -497,11 +497,14 @@ const withdrawFromBucket = async ({
         }
       });
       const currentTvl = Number(bucket.tvl);
-      const newTvl = Math.max(0, currentTvl - amt);
-      const b = await tx.bucket.update({
-        where: { id: bucket.id },
-        data: { tvl: newTvl }
-      });
+const newTvl = Number(bucket.tvl) - amt;
+     if (newTvl < 0) {
+       return status(400, response(false, null, errors.withdrawInsufficient400));
+     }
+     const b = await tx.bucket.update({
+       where: { id: bucket.id },
+       data: { tvl: { decrement: amt } }
+     });
       return { withdrawal, bucket: b };
     });
 

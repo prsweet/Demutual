@@ -21,6 +21,39 @@ function jupiterHeaders(contentType?: string): Record<string, string> {
   return h;
 }
 
+/** Exponential backoff retry with jitter. Retries on transient HTTP errors and 429s. */
+async function retryFetch<T>(
+  fn: () => Promise<T>,
+  opts?: { maxRetries?: number; baseDelayMs?: number }
+): Promise<T> {
+  const maxRetries = opts?.maxRetries ?? 3;
+  const baseDelayMs = opts?.baseDelayMs ?? 400;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const isRateLimit = msg.includes("429") || msg.includes("RATE");
+      const isTransient =
+        isRateLimit ||
+        msg.includes("ECONNRESET") ||
+        msg.includes("ETIMEDOUT") ||
+        msg.includes("JUPITER_QUOTE_HTTP_5") ||
+        msg.includes("JUPITER_ORDER_HTTP_5") ||
+        msg.includes("JUPITER_SWAP_HTTP_5");
+
+      if (!isTransient || attempt === maxRetries) throw e;
+
+      // Exponential backoff with ±25% jitter
+      const delayMs = baseDelayMs * 2 ** attempt + Math.random() * baseDelayMs * 0.5;
+      await new Promise((r) => setTimeout(r, Math.floor(delayMs)));
+    }
+  }
+  // Unreachable, but satisfies TS
+  throw new Error("JUPITER_RETRY_EXHAUSTED");
+}
+
 export type JupiterQuoteResponse = Record<string, unknown>;
 
 export async function jupiterGetQuote(params: {
@@ -31,64 +64,7 @@ export async function jupiterGetQuote(params: {
   slippageBps: number;
   swapMode?: "ExactIn" | "ExactOut";
 }): Promise<JupiterQuoteResponse> {
-  const u = new URL(`${JUPITER_HOST}/swap/v1/quote`);
-  u.searchParams.set("inputMint", params.inputMint);
-  u.searchParams.set("outputMint", params.outputMint);
-  u.searchParams.set("amount", String(params.amountLamports));
-  u.searchParams.set("slippageBps", String(params.slippageBps));
-  if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
-
-  const res = await fetch(u.toString(), { headers: jupiterHeaders() });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`JUPITER_QUOTE_HTTP_${res.status}: ${t.slice(0, 400)}`);
-  }
-  return (await res.json()) as JupiterQuoteResponse;
-}
-
-export async function jupiterPostSwap(params: {
-  quoteResponse: JupiterQuoteResponse;
-  userPublicKey: string;
-}): Promise<{ swapTransaction: string }> {
-  const u = `${JUPITER_HOST}/swap/v1/swap`;
-
-  const body = {
-    quoteResponse: params.quoteResponse,
-    userPublicKey: params.userPublicKey,
-    wrapAndUnwrapSol: true,
-    dynamicComputeUnitLimit: true,
-    prioritizationFeeLamports: "auto"
-  };
-
-  const res = await fetch(u, { method: "POST", headers: jupiterHeaders("application/json"), body: JSON.stringify(body) });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`JUPITER_SWAP_HTTP_${res.status}: ${t.slice(0, 400)}`);
-  }
-  const j = (await res.json()) as { swapTransaction?: string };
-  if (!j.swapTransaction || typeof j.swapTransaction !== "string") {
-    throw new Error("JUPITER_SWAP_NO_TX");
-  }
-  return { swapTransaction: j.swapTransaction };
-}
-
-/**
- * V2 `/swap/v2/order` returns an opaque 500 `{"error":"Something unexpected occurred"}`
- * for invalid or untradable mints. V1 `/swap/v1/quote` returns a clean 400 with
- * `{"errorCode":"TOKEN_NOT_TRADABLE", ...}` for the same input. Probe V1 to recover
- * the real error so callers and logs get something actionable.
- *
- * Returns null if V1 succeeds (V2 failure was transient) or fails opaquely (no
- * structured error to surface) — caller should then fall back to the raw V2 text.
- */
-async function probeV1Diagnosis(params: {
-  inputMint: string;
-  outputMint: string;
-  amountLamports: number;
-  slippageBps: number;
-  swapMode?: "ExactIn" | "ExactOut";
-}): Promise<string | null> {
-  try {
+  return retryFetch(async () => {
     const u = new URL(`${JUPITER_HOST}/swap/v1/quote`);
     u.searchParams.set("inputMint", params.inputMint);
     u.searchParams.set("outputMint", params.outputMint);
@@ -97,22 +73,44 @@ async function probeV1Diagnosis(params: {
     if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
 
     const res = await fetch(u.toString(), { headers: jupiterHeaders() });
-    if (res.ok) return null;
-    const raw = await res.text().catch(() => "");
-    let body: { error?: string; errorCode?: string } | null = null;
-    try {
-      body = raw ? (JSON.parse(raw) as { error?: string; errorCode?: string }) : null;
-    } catch {
-      body = null;
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`JUPITER_QUOTE_HTTP_${res.status}: ${t.slice(0, 400)}`);
     }
-    if (body?.errorCode) {
-      return body.error ? `${body.errorCode}: ${body.error}` : body.errorCode;
+    return (await res.json()) as JupiterQuoteResponse;
+  });
+}
+
+export async function jupiterPostSwap(params: {
+  quoteResponse: JupiterQuoteResponse;
+  userPublicKey: string;
+}): Promise<{ swapTransaction: string }> {
+  return retryFetch(async () => {
+    const u = `${JUPITER_HOST}/swap/v1/swap`;
+
+    const body = {
+      quoteResponse: params.quoteResponse,
+      userPublicKey: params.userPublicKey,
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      prioritizationFeeLamports: "auto"
+    };
+
+    const res = await fetch(u, {
+      method: "POST",
+      headers: jupiterHeaders("application/json"),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`JUPITER_SWAP_HTTP_${res.status}: ${t.slice(0, 400)}`);
     }
-    if (body?.error) return body.error;
-    return null;
-  } catch {
-    return null;
-  }
+    const j = (await res.json()) as { swapTransaction?: string };
+    if (!j.swapTransaction || typeof j.swapTransaction !== "string") {
+      throw new Error("JUPITER_SWAP_NO_TX");
+    }
+    return { swapTransaction: j.swapTransaction };
+  });
 }
 
 export async function jupiterOrder(params: {
@@ -136,23 +134,11 @@ export async function jupiterOrder(params: {
     u.searchParams.set("payer", params.taker);
   }
 
-  const res = await fetch(u.toString(), { headers: jupiterHeaders() });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    if (res.status === 500) {
-      const diag = await probeV1Diagnosis({
-        inputMint: params.inputMint,
-        outputMint: params.outputMint,
-        amountLamports: params.amountLamports,
-        slippageBps: params.slippageBps,
-        swapMode: params.swapMode
-      });
-      if (diag) {
-        throw new Error(`JUPITER_ORDER_${diag.slice(0, 300)}`);
-      }
-    }
-    throw new Error(`JUPITER_ORDER_HTTP_${res.status}: ${t.slice(0, 400)}`);
-  }
+const res = await fetch(u.toString(), { headers: jupiterHeaders() });
+   if (!res.ok) {
+     const t = await res.text().catch(() => "");
+     throw new Error(`JUPITER_ORDER_HTTP_${res.status}: ${t.slice(0, 400)}`);
+   }
   const data = (await res.json()) as {
     transaction?: unknown;
     requestId?: unknown;

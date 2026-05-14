@@ -67,7 +67,22 @@ model History {
     id String @id @default(cuid())
     userId String
     user User @relation(references: [id], fields: [userId])
-    purchaseDate DateTime // have to complete it
+    bucketId String?
+    bucket Bucket? @relation(references: [id], fields: [bucketId])
+    amount Decimal
+    type HistoryType
+    direction HistoryDirection
+    purchaseDate DateTime @default(now())
+}
+
+enum HistoryType {
+    INVEST
+    WITHDRAW
+}
+
+enum HistoryDirection {
+    BUY
+    SELL
 }
 
 model Asset {
@@ -120,6 +135,7 @@ model Bucket {
     deposits Deposit[]
     withdrawals Withdrawal[]
     basketAttempts BasketAttempt[]
+    history History[]
     @@unique([creatorId, name, version])
 }
 

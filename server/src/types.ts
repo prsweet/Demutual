@@ -264,5 +264,6 @@ export const errors = {
   attemptNotFound404: "ATTEMPT_NOT_FOUND",
   attemptNotResumable400: "ATTEMPT_NOT_RESUMABLE",
   attemptNoLegsToResume400: "ATTEMPT_NO_LEGS_TO_RESUME",
-  attemptLegMismatch400: "ATTEMPT_LEG_MISMATCH"
+  attemptLegMismatch400: "ATTEMPT_LEG_MISMATCH",
+  invalidSlippageBps400: "SLIPPAGE_BPS_INVALID"
 }

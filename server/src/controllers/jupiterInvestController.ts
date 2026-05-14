@@ -98,13 +98,17 @@ const buildJupiterPlan = async ({
     const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
     const creatorVerified = Boolean(bucket.creator?.feeReceiverVerified);
 
-    const platLamports = platformFeeActive() ? Math.floor((swapLamports * platBps) / 10000) : 0;
-    // Creator share is calculated regardless of verification so the investor's gross-up math
-    // stays consistent; we just skip its actual transfer below until the creator verifies.
-    const creatorLamports =
-      creatorBps > 0 && creatorWallet ? Math.floor((swapLamports * creatorBps) / 10000) : 0;
-    const grossLamports = swapLamports + platLamports + creatorLamports;
-    const gross = grossLamports / 1e9;
+const platLamports = platformFeeActive()
+       ? (netSwapLamportsBig * BigInt(platBps)) / 10000n
+       : 0n;
+     // Creator share is calculated regardless of verification so the investor's gross-up math
+     // stays consistent; we just skip its actual transfer below until the creator verifies.
+     const creatorLamports =
+       creatorBps > 0 && creatorWallet
+         ? (netSwapLamportsBig * BigInt(creatorBps)) / 10000n
+         : 0n;
+     const grossLamports = netSwapLamportsBig + platLamports + creatorLamports;
+     const gross = Number(grossLamports) / 1e9;
 
     const listings = [...bucket.listing].sort((a, b) =>
       (a.asset?.symbol ?? "").localeCompare(b.asset?.symbol ?? "")
@@ -118,8 +122,11 @@ const buildJupiterPlan = async ({
       return status(400, response(false, null, errors.amountBelowMin400));
     }
 
-    const slippageBps = body.slippageBps ?? 80;
-    const legs: PlanLeg[] = [];
+const slippageBps = body.slippageBps ?? 80;
+     if (slippageBps < 1 || slippageBps > 5000) {
+       return status(400, response(false, null, errors.invalidSlippageBps400));
+     }
+     const legs: PlanLeg[] = [];
     let allocated = 0;
     const n = listings.length;
 
@@ -206,18 +213,16 @@ const buildJupiterPlan = async ({
       bps: number;
     };
     const candidates: Split[] = [];
-    if (platLamports > 0 && platWallet) {
-      candidates.push({ recipient: "platform", toPubkey: platWallet, lamports: platLamports, bps: platBps });
+    if (platLamports > 0n && platWallet) {
+      candidates.push({ recipient: "platform", toPubkey: platWallet, lamports: Number(platLamports), bps: platBps });
     }
-    // Creator fee only enters the split set if the creator has explicitly verified their wallet
-    // via /users/me/verify-fee-receiver. Until then we just skip it; platform fee still pays.
-    const creatorSkippedUnverified = creatorLamports > 0 && creatorWallet && !creatorVerified;
-    if (creatorLamports > 0 && creatorWallet && creatorVerified) {
-      candidates.push({ recipient: "creator", toPubkey: creatorWallet, lamports: creatorLamports, bps: creatorBps });
+    if (creatorLamports > 0n && creatorWallet && creatorVerified) {
+      candidates.push({ recipient: "creator", toPubkey: creatorWallet, lamports: Number(creatorLamports), bps: creatorBps });
     }
 
-    const skippedReasons: string[] = [];
-    if (creatorSkippedUnverified) {
+    const creatorSkippedUnverified = creatorLamports > 0n && creatorWallet && !creatorVerified;
+     const skippedReasons: string[] = [];
+     if (creatorSkippedUnverified) {
       skippedReasons.push(
         "Creator fee skipped: bucket creator has not verified their fee-receiver wallet yet (platform fee paid as normal)."
       );
@@ -355,23 +360,23 @@ const completeJupiterInvest = async ({
     const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
     const creatorVerified = Boolean(bucket.creator?.feeReceiverVerified);
 
-    const platBps = platformFeeBps();
-    const platWallet = platformFeeWallet();
-    const creatorBps = creatorFeeBps();
-    const intendedSwapLamports = Number(grossLamportsFromSol(Number(attempt.intendedSol)));
-    const expectedPlat = platformFeeActive()
-      ? Math.floor((intendedSwapLamports * platBps) / 10000)
-      : 0;
-    // Creator side included in expected transfers only when verified — mirrors the build path.
-    const expectedCreator =
-      creatorBps > 0 && creatorWallet && creatorVerified
-        ? Math.floor((intendedSwapLamports * creatorBps) / 10000)
-        : 0;
-    const expectedTransfers: { to: string; lamports: bigint }[] = [];
-    if (expectedPlat > 0 && platWallet)
-      expectedTransfers.push({ to: platWallet, lamports: BigInt(expectedPlat) });
-    if (expectedCreator > 0 && creatorWallet)
-      expectedTransfers.push({ to: creatorWallet, lamports: BigInt(expectedCreator) });
+const platBps = platformFeeBps();
+     const platWallet = platformFeeWallet();
+     const creatorBps = creatorFeeBps();
+     const intendedSwapLamports = grossLamportsFromSol(Number(attempt.intendedSol)); // bigint
+     const expectedPlat = platformFeeActive()
+       ? (intendedSwapLamports * BigInt(platBps)) / 10000n
+       : 0n;
+     // Creator side included in expected transfers only when verified — mirrors the build path.
+     const expectedCreator =
+       creatorBps > 0 && creatorWallet && creatorVerified
+         ? (intendedSwapLamports * BigInt(creatorBps)) / 10000n
+         : 0n;
+     const expectedTransfers: { to: string; lamports: bigint }[] = [];
+     if (expectedPlat > 0 && platWallet)
+       expectedTransfers.push({ to: platWallet, lamports: expectedPlat });
+     if (expectedCreator > 0 && creatorWallet)
+       expectedTransfers.push({ to: creatorWallet, lamports: expectedCreator });
 
     // Fee verification only runs once — on the first complete call (when feeTransferSignature
     // hasn't been persisted yet). Resume calls skip this entirely.
@@ -489,15 +494,15 @@ const completeJupiterInvest = async ({
       // 4) Upsert the Deposit row for this attempt (one Deposit per attempt; amount is
       //    sum of SUCCESS-leg lamports as SOL). On resume we update amount + add to TVL.
       let deposit;
-      const depositSol = totalSuccessLamports / 1e9;
-      const platformFeeShareSol =
-        intendedSwapLamports > 0
-          ? (expectedPlat * (totalSuccessLamports / intendedSwapLamports)) / 1e9
-          : 0;
-      const creatorFeeShareSol =
-        intendedSwapLamports > 0
-          ? (expectedCreator * (totalSuccessLamports / intendedSwapLamports)) / 1e9
-          : 0;
+const depositSol = totalSuccessLamports / 1e9;
+       const platformFeeShareSol =
+         intendedSwapLamports > 0n
+           ? Number((expectedPlat * BigInt(totalSuccessLamports)) / intendedSwapLamports) / 1e9
+           : 0;
+       const creatorFeeShareSol =
+         intendedSwapLamports > 0n
+           ? Number((expectedCreator * BigInt(totalSuccessLamports)) / intendedSwapLamports) / 1e9
+           : 0;
 
       const firstSuccessSig =
         body.legs.find((r) => r.status === "SUCCESS")?.signature?.trim() ?? null;
@@ -541,15 +546,18 @@ const completeJupiterInvest = async ({
         }
       }
 
-      // 5) Update bucket TVL by the delta only (positive on first credit, additive on resume).
-      const tvlDelta = depositSol - oldAmount;
-      let bucketUpdate: { id: string; tvl: unknown } = bucket;
-      if (tvlDelta !== 0) {
-        bucketUpdate = await tx.bucket.update({
-          where: { id: bucket.id },
-          data: { tvl: Number(bucket.tvl) + tvlDelta }
-        });
-      }
+// 5) Update bucket TVL by the delta only (positive on first credit, additive on resume).
+       const tvlDelta = depositSol - oldAmount;
+       let bucketUpdate: { id: string; tvl: unknown } = bucket;
+       if (tvlDelta !== 0) {
+         const updateData = tvlDelta > 0
+           ? { tvl: { increment: tvlDelta } }
+           : { tvl: { decrement: -tvlDelta } };
+         bucketUpdate = await tx.bucket.update({
+           where: { id: bucket.id },
+           data: updateData
+         });
+       }
 
       return {
         deposit,
@@ -588,8 +596,8 @@ const completeJupiterInvest = async ({
             actuallyInvestedSol: result.depositSol,
             platformFeeBps: platBps,
             creatorFeeBps: creatorBps,
-            platformFeeSol: expectedPlat / 1e9,
-            creatorFeeSol: expectedCreator / 1e9,
+            platformFeeSol: Number(expectedPlat) / 1e9,
+            creatorFeeSol: Number(expectedCreator) / 1e9,
             note:
               result.attemptStatus !== "COMPLETE"
                 ? "Fees were charged on the originally-intended SOL amount; only the successfully swapped legs counted toward your basket position. Resume the attempt to fill the rest at no extra fee."
@@ -865,8 +873,11 @@ const resumeJupiterAttempt = async ({
       return status(400, response(false, null, errors.attemptNotResumable400));
     }
 
-    const slippageBps = body.slippageBps ?? attempt.slippageBps ?? 80;
-    const toResume = attempt.legs.filter(
+const slippageBps = body.slippageBps ?? attempt.slippageBps ?? 80;
+     if (slippageBps < 1 || slippageBps > 5000) {
+       return status(400, response(false, null, errors.invalidSlippageBps400));
+     }
+     const toResume = attempt.legs.filter(
       (l) => l.status === "PENDING" || l.status === "FAILED"
     );
     if (toResume.length === 0) {

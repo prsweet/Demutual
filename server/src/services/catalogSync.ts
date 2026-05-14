@@ -138,54 +138,50 @@ export async function bootstrapCatalogFromJupiter(): Promise<CatalogSyncResult> 
     } catch (e) {
       console.warn("[catalogSync] Jupiter fetch failed", e);
       result.errors.push({ id: "JUPITER_TAG", reason: e instanceof Error ? e.message : String(e) });
-      // Fall through — we may still have in-memory data from a previous successful boot.
       return result;
     }
 
     setCatalogTokens(parsed.map((p) => p.asset));
     result.inMemory = parsed.length;
 
-    // Persist to DB so existing bucket listings keep working across restarts even if Jupiter is down.
-    // Skip silently on DB errors — in-memory is still usable.
+    // Bulk upsert via raw SQL — chunked at 100 to stay well under Postgres parameter limits.
+    const CHUNK_SIZE = 100;
     const now = new Date();
-    for (const p of parsed) {
+    for (let i = 0; i < parsed.length; i += CHUNK_SIZE) {
+      const chunk = parsed.slice(i, i + CHUNK_SIZE);
+      const values: unknown[] = [];
+      const placeholders: string[] = [];
+
+      chunk.forEach((p, idx) => {
+        const base = idx * 11; // 11 bind params per row
+        placeholders.push(
+          `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}::jsonb, $${base + 11})`
+        );
+        values.push(
+          p.asset.id,
+          p.asset.name,
+          p.asset.symbol,
+          p.asset.iconUrl,
+          p.asset.decimals,
+          p.asset.category,
+          true, // inCatalog
+          p.isVerified,
+          p.isSus,
+          JSON.stringify(p.tags),
+          now
+        );
+      });
+
       try {
-        await prisma.asset.upsert({
-          where: { id: p.asset.id },
-          create: {
-            id: p.asset.id,
-            name: p.asset.name,
-            symbol: p.asset.symbol,
-            iconUrl: p.asset.iconUrl,
-            decimals: p.asset.decimals,
-            category: p.asset.category,
-            inCatalog: true,
-            isVerified: p.isVerified,
-            isSus: p.isSus,
-            organicScore: p.organicScore,
-            organicScoreLabel: p.organicScoreLabel,
-            tags: p.tags as unknown as object,
-            lastSyncedAt: now
-          },
-          update: {
-            name: p.asset.name,
-            symbol: p.asset.symbol,
-            iconUrl: p.asset.iconUrl,
-            decimals: p.asset.decimals,
-            category: p.asset.category,
-            inCatalog: true,
-            isVerified: p.isVerified,
-            isSus: p.isSus,
-            organicScore: p.organicScore,
-            organicScoreLabel: p.organicScoreLabel,
-            tags: p.tags as unknown as object,
-            lastSyncedAt: now
-          }
-        });
-        result.upsertedToDb += 1;
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "Asset" ("id","name","symbol","iconUrl","decimals","category","inCatalog","isVerified","isSus","tags","lastSyncedAt") VALUES ${placeholders.join(", ")} ON CONFLICT ("id") DO UPDATE SET "name"=EXCLUDED."name","symbol"=EXCLUDED."symbol","iconUrl"=EXCLUDED."iconUrl","decimals"=EXCLUDED."decimals","category"=EXCLUDED."category","inCatalog"=EXCLUDED."inCatalog","isVerified"=EXCLUDED."isVerified","isSus"=EXCLUDED."isSus","tags"=EXCLUDED."tags","lastSyncedAt"=EXCLUDED."lastSyncedAt"`,
+          ...values
+        );
+        result.upsertedToDb += chunk.length;
       } catch (e) {
+        console.warn(`[catalogSync] bulk upsert chunk ${i / CHUNK_SIZE} failed`, e);
         result.errors.push({
-          id: p.asset.id,
+          id: `CHUNK_${i / CHUNK_SIZE}`,
           reason: e instanceof Error ? e.message : String(e)
         });
       }

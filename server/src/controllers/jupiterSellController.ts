@@ -118,6 +118,9 @@ const buildJupiterSellPlan = async ({
     }
 
     const slippageBps = body.slippageBps ?? 80;
+    if (slippageBps < 1 || slippageBps > 5000) {
+      return status(400, response(false, null, errors.invalidSlippageBps400));
+    }
 
     // Pre-allocate the per-listing SOL targets so we can create the BasketAttempt + legs
     // (with `legId`) BEFORE quoting Jupiter. This way the FE can persist per-leg outcomes.
@@ -451,26 +454,29 @@ const completeJupiterSell = async ({
         }
       }
 
-      const tvlDelta = totalSol - oldAmount;
-      let bucketUpdate = bucket;
-      if (tvlDelta !== 0) {
-        const newTvl = Math.max(0, Number(bucket.tvl) - tvlDelta);
-        bucketUpdate = await tx.bucket.update({
-          where: { id: bucket.id },
-          data: { tvl: newTvl }
-        });
-      }
+       const tvlDelta = totalSol - oldAmount;
+       const newTvl = Number(bucket.tvl) - tvlDelta;
+       if (newTvl < 0) {
+         throw Object.assign(new Error(errors.withdrawInsufficient400), { code: "NEGATIVE_TVL" });
+       }
 
-      return {
-        withdrawal,
-        bucket: bucketUpdate,
-        attemptStatus: newStatus,
-        totalSol,
-        successLegIds: refreshed.filter((l) => l.status === "SUCCESS").map((l) => l.id),
-        failedLegIds: refreshed.filter((l) => l.status === "FAILED").map((l) => l.id),
-        pendingLegIds: refreshed.filter((l) => l.status === "PENDING").map((l) => l.id)
-      };
-    });
+       const resultBucket = tvlDelta === 0
+         ? bucket
+         : await tx.bucket.update({
+           where: { id: bucket.id },
+           data: tvlDelta > 0 ? { tvl: { decrement: tvlDelta } } : { tvl: { increment: -tvlDelta } }
+         });
+
+       return {
+         withdrawal,
+         bucket: resultBucket,
+         attemptStatus: newStatus,
+         totalSol,
+         successLegIds: refreshed.filter((l) => l.status === "SUCCESS").map((l) => l.id),
+         failedLegIds: refreshed.filter((l) => l.status === "FAILED").map((l) => l.id),
+         pendingLegIds: refreshed.filter((l) => l.status === "PENDING").map((l) => l.id)
+       };
+     });
 
     return status(
       result.attemptStatus === "COMPLETE" ? 201 : 200,
@@ -503,6 +509,9 @@ const completeJupiterSell = async ({
     );
   } catch (e) {
     const code = e && typeof e === "object" && "code" in e ? (e as { code: string }).code : "";
+      if (code === "NEGATIVE_TVL") {
+        return status(400, response(false, null, errors.withdrawInsufficient400));
+      }
     if (code === "P2002") {
       return status(409, response(false, null, errors.sellTxDuplicate409));
     }
@@ -546,6 +555,9 @@ const resumeJupiterSellAttempt = async ({
     }
 
     const slippageBps = body.slippageBps ?? attempt.slippageBps ?? 80;
+    if (slippageBps < 1 || slippageBps > 5000) {
+      return status(400, response(false, null, errors.invalidSlippageBps400));
+    }
     const toResume = attempt.legs.filter(
       (l) => l.status === "PENDING" || l.status === "FAILED"
     );
