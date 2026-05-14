@@ -217,16 +217,13 @@ const buildJupiterSellPlan = async ({
           await new Promise((resolve) => setTimeout(resolve, 600));
         }
       } catch (e) {
-        console.error("[buildJupiterSellPlan leg]", legRow.mint, e);
-        await prisma.basketAttempt.update({
-          where: { id: attempt.id },
-          data: { status: "ABANDONED", abandonedAt: new Date() }
-        });
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.startsWith("JUPITER_TAKER_INSUFFICIENT_FUNDS")) {
-          return status(400, response(false, null, errors.walletMissingBasketAssets400));
-        }
-        return status(400, response(false, null, errors.jupiterSellPlan400));
+         const msg = e instanceof Error ? e.message : String(e);
+         console.error("[buildJupiterSellPlan leg]", legRow.mint, msg);
+         await prisma.basketAttempt.update({
+           where: { id: attempt.id },
+           data: { status: "ABANDONED", abandonedAt: new Date() }
+         });
+         return status(400, response(false, null, msg));
       }
     }
 
@@ -250,12 +247,13 @@ const buildJupiterSellPlan = async ({
       )
     );
   } catch (e) {
-    console.error("[buildJupiterSellPlan]", e);
-    return status(500, response(false, null, errors.serverError500));
-  }
-};
+     const msg = e instanceof Error ? e.message : String(e);
+     console.error("[buildJupiterSellPlan]", msg);
+     return status(500, response(false, null, msg));
+   }
+ };
 
-/** Per-leg sell complete: only successful legs reduce the user's basket position and
+ /** Per-leg sell complete: only successful legs reduce the user's basket position and
  * the bucket TVL. Idempotent for resume — running this multiple times on the same attempt
  * updates the single Withdrawal row by the delta of newly-successful legs.
  */
@@ -562,30 +560,32 @@ const resumeJupiterSellAttempt = async ({
           await new Promise((resolve) => setTimeout(resolve, 600));
         }
       } catch (e) {
-        console.error("[resumeJupiterSellAttempt leg]", legRow.mint, e);
-        return status(400, response(false, null, errors.jupiterSellPlan400));
-      }
-    }
+         const msg = e instanceof Error ? e.message : String(e);
+         console.error("[resumeJupiterSellAttempt leg]", legRow.mint, msg);
+         return status(400, response(false, null, msg));
+       }
+     }
 
-    return status(
-      200,
-      response(
-        true,
-        toJsonSafe({
-          attemptId: attempt.id,
-          slippageBps,
-          legs
-        }),
-        null
-      )
-    );
-  } catch (e) {
-    console.error("[resumeJupiterSellAttempt]", e);
-    return status(500, response(false, null, errors.serverError500));
-  }
-};
+     return status(
+       200,
+       response(
+         true,
+         toJsonSafe({
+           attemptId: attempt.id,
+           slippageBps,
+           legs
+         }),
+         null
+       )
+     );
+   } catch (e) {
+     const msg = e instanceof Error ? e.message : String(e);
+     console.error("[resumeJupiterSellAttempt]", msg);
+     return status(500, response(false, null, msg));
+   }
+ };
 
-export const jupiterSellControllers = {
+ export const jupiterSellControllers = {
   buildJupiterSellPlan,
   completeJupiterSell,
   resumeJupiterSellAttempt
