@@ -11,6 +11,9 @@
 const PRICE_TTL_MS = 30_000;
 const PRICE_HOST = "https://api.jup.ag";
 
+/** Cached at module load — avoids process.env read + .trim() on every price fetch. */
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY?.trim() || null;
+
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 type CacheEntry = {
@@ -52,8 +55,7 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
 
   if (need.length > 0) {
     const headers: Record<string, string> = { Accept: "application/json" };
-    const key = process.env.JUPITER_API_KEY?.trim();
-    if (key) headers["x-api-key"] = key;
+    if (JUPITER_API_KEY) headers["x-api-key"] = JUPITER_API_KEY;
 
     for (let i = 0; i < need.length; i += 50) {
       const chunk = need.slice(i, i + 50);

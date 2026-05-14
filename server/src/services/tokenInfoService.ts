@@ -12,6 +12,9 @@
 const TOKEN_INFO_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const TOKENS_HOST = "https://api.jup.ag";
 
+/** Cached at module load — avoids process.env read + .trim() on every token info fetch. */
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY?.trim() || null;
+
 export type TokenInfo = {
   mint: string;
   name: string | null;
@@ -104,8 +107,7 @@ export async function getTokenInfo(rawMints: string[]): Promise<TokenInfoResult>
 
   if (need.length > 0) {
     const headers: Record<string, string> = { Accept: "application/json" };
-    const key = process.env.JUPITER_API_KEY?.trim();
-    if (key) headers["x-api-key"] = key;
+    if (JUPITER_API_KEY) headers["x-api-key"] = JUPITER_API_KEY;
 
     for (let i = 0; i < need.length; i += 100) {
       const chunk = need.slice(i, i + 100);

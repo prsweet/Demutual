@@ -10,8 +10,15 @@ const DEFAULT_HOST = "https://api.jup.ag";
 
 export const WSOL_MINT = "So11111111111111111111111111111111111111112";
 
-function jupiterHost(): string {
-  return (process.env.JUPITER_API_HOST ?? DEFAULT_HOST).replace(/\/+$/, "");
+/** Cached at module load — avoids process.env read + .trim() on every API call. */
+const JUPITER_HOST = (process.env.JUPITER_API_HOST ?? DEFAULT_HOST).replace(/\/+$/, "");
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY?.trim() || null;
+
+function jupiterHeaders(contentType?: string): Record<string, string> {
+  const h: Record<string, string> = { Accept: "application/json" };
+  if (contentType) h["Content-Type"] = contentType;
+  if (JUPITER_API_KEY) h["x-api-key"] = JUPITER_API_KEY;
+  return h;
 }
 
 export type JupiterQuoteResponse = Record<string, unknown>;
@@ -24,18 +31,14 @@ export async function jupiterGetQuote(params: {
   slippageBps: number;
   swapMode?: "ExactIn" | "ExactOut";
 }): Promise<JupiterQuoteResponse> {
-  const u = new URL(`${jupiterHost()}/swap/v1/quote`);
+  const u = new URL(`${JUPITER_HOST}/swap/v1/quote`);
   u.searchParams.set("inputMint", params.inputMint);
   u.searchParams.set("outputMint", params.outputMint);
   u.searchParams.set("amount", String(params.amountLamports));
   u.searchParams.set("slippageBps", String(params.slippageBps));
   if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const key = process.env.JUPITER_API_KEY?.trim();
-  if (key) headers["x-api-key"] = key;
-
-  const res = await fetch(u.toString(), { headers });
+  const res = await fetch(u.toString(), { headers: jupiterHeaders() });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`JUPITER_QUOTE_HTTP_${res.status}: ${t.slice(0, 400)}`);
@@ -47,13 +50,7 @@ export async function jupiterPostSwap(params: {
   quoteResponse: JupiterQuoteResponse;
   userPublicKey: string;
 }): Promise<{ swapTransaction: string }> {
-  const u = `${jupiterHost()}/swap/v1/swap`;
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    "Content-Type": "application/json"
-  };
-  const key = process.env.JUPITER_API_KEY?.trim();
-  if (key) headers["x-api-key"] = key;
+  const u = `${JUPITER_HOST}/swap/v1/swap`;
 
   const body = {
     quoteResponse: params.quoteResponse,
@@ -63,7 +60,7 @@ export async function jupiterPostSwap(params: {
     prioritizationFeeLamports: "auto"
   };
 
-  const res = await fetch(u, { method: "POST", headers, body: JSON.stringify(body) });
+  const res = await fetch(u, { method: "POST", headers: jupiterHeaders("application/json"), body: JSON.stringify(body) });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`JUPITER_SWAP_HTTP_${res.status}: ${t.slice(0, 400)}`);
@@ -92,18 +89,14 @@ async function probeV1Diagnosis(params: {
   swapMode?: "ExactIn" | "ExactOut";
 }): Promise<string | null> {
   try {
-    const u = new URL(`${jupiterHost()}/swap/v1/quote`);
+    const u = new URL(`${JUPITER_HOST}/swap/v1/quote`);
     u.searchParams.set("inputMint", params.inputMint);
     u.searchParams.set("outputMint", params.outputMint);
     u.searchParams.set("amount", String(params.amountLamports));
     u.searchParams.set("slippageBps", String(params.slippageBps));
     if (params.swapMode) u.searchParams.set("swapMode", params.swapMode);
 
-    const headers: Record<string, string> = { Accept: "application/json" };
-    const key = process.env.JUPITER_API_KEY?.trim();
-    if (key) headers["x-api-key"] = key;
-
-    const res = await fetch(u.toString(), { headers });
+    const res = await fetch(u.toString(), { headers: jupiterHeaders() });
     if (res.ok) return null;
     const raw = await res.text().catch(() => "");
     let body: { error?: string; errorCode?: string } | null = null;
@@ -131,7 +124,7 @@ export async function jupiterOrder(params: {
   taker: string;
   previewMode?: boolean;
 }): Promise<{ transaction: string; requestId: string; outAmount: string; otherAmountThreshold?: string }> {
-  const u = new URL(`${jupiterHost()}/swap/v2/order`);
+  const u = new URL(`${JUPITER_HOST}/swap/v2/order`);
   u.searchParams.set("inputMint", params.inputMint);
   u.searchParams.set("outputMint", params.outputMint);
   u.searchParams.set("amount", String(params.amountLamports));
@@ -143,11 +136,7 @@ export async function jupiterOrder(params: {
     u.searchParams.set("payer", params.taker);
   }
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const key = process.env.JUPITER_API_KEY?.trim();
-  if (key) headers["x-api-key"] = key;
-
-  const res = await fetch(u.toString(), { headers });
+  const res = await fetch(u.toString(), { headers: jupiterHeaders() });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     if (res.status === 500) {
@@ -218,17 +207,11 @@ export async function jupiterExecute(params: {
   outputAmountResult: string;
   error?: string;
 }> {
-  const u = `${jupiterHost()}/swap/v2/execute`;
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    "Content-Type": "application/json"
-  };
-  const key = process.env.JUPITER_API_KEY?.trim();
-  if (key) headers["x-api-key"] = key;
+  const u = `${JUPITER_HOST}/swap/v2/execute`;
 
   const res = await fetch(u, {
     method: "POST",
-    headers,
+    headers: jupiterHeaders("application/json"),
     body: JSON.stringify({
       signedTransaction: params.signedTransaction,
       requestId: params.requestId,

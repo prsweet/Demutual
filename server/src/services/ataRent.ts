@@ -23,15 +23,29 @@ export async function estimateMissingAtaRentLamports(params: {
   estimatedRentLamports: number;
 }> {
   const connection = new Connection(params.rpcUrl, "confirmed");
-  const rentPerAtaLamports = await connection.getMinimumBalanceForRentExemption(165, "confirmed");
-
   const uniqueMints = [...new Set(params.mints.map((m) => m.trim()).filter(Boolean))];
-  const missingAtas: { mint: string; ata: string }[] = [];
 
-  for (const mint of uniqueMints) {
-    const ata = await getAssociatedTokenAddress({ owner: params.owner, mint });
-    const info = await connection.getAccountInfo(new PublicKey(ata), "confirmed");
-    if (!info) missingAtas.push({ mint, ata });
+  // Derive all ATA addresses locally (deterministic PDAs) in parallel.
+  const ataEntries = await Promise.all(
+    uniqueMints.map(async (mint) => ({
+      mint,
+      ata: await getAssociatedTokenAddress({ owner: params.owner, mint })
+    }))
+  );
+
+  // Batch-fetch all ATA accounts in a single RPC call instead of N sequential ones.
+  const ataPubkeys = ataEntries.map((e) => new PublicKey(e.ata));
+  const [rentPerAtaLamports, accountInfos] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(165, "confirmed"),
+    connection.getMultipleAccountsInfo(ataPubkeys, "confirmed")
+  ]);
+
+  const missingAtas: { mint: string; ata: string }[] = [];
+  for (let i = 0; i < ataEntries.length; i++) {
+    const entry = ataEntries[i]!;
+    if (!accountInfos[i]) {
+      missingAtas.push({ mint: entry.mint, ata: entry.ata });
+    }
   }
 
   return {

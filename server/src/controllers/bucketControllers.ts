@@ -289,29 +289,38 @@ const addBucketAssets = async ({
     // Make sure the Jupiter-sourced catalog is loaded before we validate mints against it.
     await ensureCatalogReady();
 
-    for (const id of assetIds) {
-      const exists = await prisma.asset.findUnique({ where: { id }, select: { id: true } });
-      if (exists) continue;
+    // Batch-check which assets already exist in DB (1 query instead of N).
+    const existingAssets = await prisma.asset.findMany({
+      where: { id: { in: assetIds } },
+      select: { id: true }
+    });
+    const existingIds = new Set(existingAssets.map((a) => a.id));
+
+    // Validate unknown mints against the in-memory catalog.
+    const missingFromDb = assetIds.filter((id) => !existingIds.has(id));
+    for (const id of missingFromDb) {
       if (!getCatalogToken(id)) {
         return status(400, response(false, null, errors.unknownAsset400));
       }
     }
 
     await prisma.$transaction(async (tx) => {
-      for (const id of assetIds) {
-        const existing = await tx.asset.findUnique({ where: { id } });
-        if (existing) continue;
-        const meta = getCatalogToken(id)!;
-        await tx.asset.create({
-          data: {
-            id: meta.id,
-            name: meta.name,
-            symbol: meta.symbol,
-            iconUrl: meta.iconUrl,
-            decimals: meta.decimals,
-            category: meta.category,
-            inCatalog: true
-          }
+      // Bulk-create only the assets missing from DB (already validated above).
+      if (missingFromDb.length > 0) {
+        await tx.asset.createMany({
+          data: missingFromDb.map((id) => {
+            const meta = getCatalogToken(id)!;
+            return {
+              id: meta.id,
+              name: meta.name,
+              symbol: meta.symbol,
+              iconUrl: meta.iconUrl,
+              decimals: meta.decimals,
+              category: meta.category,
+              inCatalog: true
+            };
+          }),
+          skipDuplicates: true
         });
       }
 

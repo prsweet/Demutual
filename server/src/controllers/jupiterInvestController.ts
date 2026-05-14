@@ -331,27 +331,29 @@ const completeJupiterInvest = async ({
       }
     }
 
-    const bucket = await prisma.bucket.findUnique({
-      where: { id: params.id },
-      select: { id: true, tvl: true, type: true }
-    });
+    const [bucket, user] = await Promise.all([
+      prisma.bucket.findUnique({
+        where: { id: params.id },
+        select: {
+          id: true,
+          tvl: true,
+          type: true,
+          creator: { select: { walletAddress: true, feeReceiverVerified: true } }
+        }
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { walletAddress: true }
+      })
+    ]);
     if (!bucket) return status(404, response(false, null, errors.bucketNotFound404));
     if (bucket.type !== "PUBLISHED") {
       return status(400, response(false, null, errors.bucketNotPublished400));
     }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { walletAddress: true }
-    });
     if (!user) return status(401, response(false, null, errors.unauthorized401));
 
-    const bucketCreator = await prisma.bucket.findUnique({
-      where: { id: params.id },
-      select: { creator: { select: { walletAddress: true, feeReceiverVerified: true } } }
-    });
-    const creatorWallet = bucketCreator?.creator?.walletAddress?.trim() || null;
-    const creatorVerified = Boolean(bucketCreator?.creator?.feeReceiverVerified);
+    const creatorWallet = bucket.creator?.walletAddress?.trim() || null;
+    const creatorVerified = Boolean(bucket.creator?.feeReceiverVerified);
 
     const platBps = platformFeeBps();
     const platWallet = platformFeeWallet();
@@ -440,19 +442,24 @@ const completeJupiterInvest = async ({
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1) Update each leg row with the reported outcome.
-      for (const r of body.legs) {
-        const leg = legById.get(r.legId)!;
-        if (leg.status === "SUCCESS") continue; // never overwrite a confirmed leg
-        await tx.basketAttemptLeg.update({
-          where: { id: r.legId },
-          data: {
-            status: r.status,
-            ...(r.signature ? { transactionSignature: r.signature.trim() } : {}),
-            ...(r.error ? { lastError: r.error.slice(0, 1024) } : {})
-          }
-        });
-      }
+      // 1) Update each leg row with the reported outcome — parallel since they target different rows.
+      await Promise.all(
+        body.legs
+          .filter((r) => {
+            const leg = legById.get(r.legId)!;
+            return leg.status !== "SUCCESS"; // never overwrite a confirmed leg
+          })
+          .map((r) =>
+            tx.basketAttemptLeg.update({
+              where: { id: r.legId },
+              data: {
+                status: r.status,
+                ...(r.signature ? { transactionSignature: r.signature.trim() } : {}),
+                ...(r.error ? { lastError: r.error.slice(0, 1024) } : {})
+              }
+            })
+          )
+      );
 
       // 2) Persist feeTransferSignature on the attempt (first call only).
       if (isFirstComplete && feeSig) {
@@ -536,7 +543,7 @@ const completeJupiterInvest = async ({
 
       // 5) Update bucket TVL by the delta only (positive on first credit, additive on resume).
       const tvlDelta = depositSol - oldAmount;
-      let bucketUpdate = bucket;
+      let bucketUpdate: { id: string; tvl: unknown } = bucket;
       if (tvlDelta !== 0) {
         bucketUpdate = await tx.bucket.update({
           where: { id: bucket.id },

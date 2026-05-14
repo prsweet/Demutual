@@ -14,6 +14,9 @@ import { prisma } from "../db";
 
 const JUPITER_VERIFIED_URL = "https://api.jup.ag/tokens/v2/tag?query=verified";
 
+/** Cached at module load — avoids process.env read + .trim() on every catalog sync. */
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY?.trim() || null;
+
 export type CatalogSyncResult = {
   fetched: number;
   inMemory: number;
@@ -110,8 +113,7 @@ export async function bootstrapCatalogFromJupiter(): Promise<CatalogSyncResult> 
   if (inflight) return inflight;
   inflight = (async () => {
     const headers: Record<string, string> = { Accept: "application/json" };
-    const key = process.env.JUPITER_API_KEY?.trim();
-    if (key) headers["x-api-key"] = key;
+    if (JUPITER_API_KEY) headers["x-api-key"] = JUPITER_API_KEY;
 
     const result: CatalogSyncResult = {
       fetched: 0,

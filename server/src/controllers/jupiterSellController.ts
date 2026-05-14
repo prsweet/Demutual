@@ -376,18 +376,24 @@ const completeJupiterSell = async ({
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      for (const r of body.legs) {
-        const leg = legById.get(r.legId)!;
-        if (leg.status === "SUCCESS") continue;
-        await tx.basketAttemptLeg.update({
-          where: { id: r.legId },
-          data: {
-            status: r.status,
-            ...(r.signature ? { transactionSignature: r.signature.trim() } : {}),
-            ...(r.error ? { lastError: r.error.slice(0, 1024) } : {})
-          }
-        });
-      }
+      // Update each leg row with the reported outcome — parallel since they target different rows.
+      await Promise.all(
+        body.legs
+          .filter((r) => {
+            const leg = legById.get(r.legId)!;
+            return leg.status !== "SUCCESS";
+          })
+          .map((r) =>
+            tx.basketAttemptLeg.update({
+              where: { id: r.legId },
+              data: {
+                status: r.status,
+                ...(r.signature ? { transactionSignature: r.signature.trim() } : {}),
+                ...(r.error ? { lastError: r.error.slice(0, 1024) } : {})
+              }
+            })
+          )
+      );
 
       const refreshed = await tx.basketAttemptLeg.findMany({
         where: { attemptId: attempt.id }
