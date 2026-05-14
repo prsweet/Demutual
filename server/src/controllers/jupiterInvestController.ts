@@ -12,7 +12,7 @@ import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestFeeBundle } from "../investTxVerify";
 import { toJsonSafe } from "../jsonSafe";
 import { checkFeeRecipientsRentSafe, estimateMissingAtaRentLamports } from "../services/ataRent";
-import { jupiterExecute, jupiterOrder, jupiterQuote, WSOL_MINT } from "../services/jupiterSwap";
+import { jupiterExecute, jupiterOrder, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
   type jupiterAttemptResumeSchema,

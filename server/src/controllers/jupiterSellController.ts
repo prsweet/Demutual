@@ -10,7 +10,7 @@ import {
 import { prisma } from "../db";
 import { grossLamportsFromSol, verifyInvestFeeBundle } from "../investTxVerify";
 import { toJsonSafe } from "../jsonSafe";
-import { jupiterGetQuote, jupiterOrder, jupiterPostSwap, jupiterQuote, WSOL_MINT } from "../services/jupiterSwap";
+import { jupiterGetQuote, jupiterOrder, jupiterPostSwap, WSOL_MINT } from "../services/jupiterSwap";
 import {
   errors,
   type jupiterAttemptResumeSchema,
