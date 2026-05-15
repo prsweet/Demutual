@@ -12,63 +12,66 @@ export function Landing() {
   const goDashboard = () => navigate("/dashboard");
 
   return (
-    <div className="p-2 w-screen min-h-screen bg-transparent font-sans">
-      <div className="w-full h-auto relative overflow-hidden">
-        <svg
-          viewBox="0 0 871 720"
-          className="w-full h-auto block"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <clipPath id="hero-shape">
-              <path d="M399.177 708.572L9.04795 539.918C3.55591 537.544 0.000121188 532.133 0.000119825 526.149L3.41611e-06 15C0 6.71573 6.71573 0 15 0H855.928C864.213 0 870.928 6.71574 870.928 15L870.928 525.948C870.928 532.029 867.256 537.509 861.631 539.821L449.928 709.031C433.641 715.725 415.341 715.56 399.177 708.572Z" />
-            </clipPath>
-          </defs>
+    <div className="p-0 md:p-2 w-screen min-h-screen bg-transparent font-sans">
+      <div className="w-full relative overflow-hidden">
+        {/* Background layer */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <svg
+            viewBox="0 0 871 720"
+            preserveAspectRatio="xMidYMax slice"
+            className="w-full h-full block"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <clipPath id="hero-shape">
+                <path d="M399.177 708.572L9.04795 539.918C3.55591 537.544 0.000121188 532.133 0.000119825 526.149L3.41611e-06 15C0 6.71573 6.71573 0 15 0H855.928C864.213 0 870.928 6.71574 870.928 15L870.928 525.948C870.928 532.029 867.256 537.509 861.631 539.821L449.928 709.031C433.641 715.725 415.341 715.56 399.177 708.572Z" />
+              </clipPath>
+            </defs>
 
-          <foreignObject x="0" y="0" width="871" height="720" clipPath="url(#hero-shape)">
-            <div style={{ width: '100%', height: '100%' }}>
-              <ImageDithering
-                width={871}
-                height={720}
-                image="https://pbs.twimg.com/media/G4CN9vdWUAAfiVD.jpg"
-                colorBack="#000c38"
-                colorFront="#94ffaf"
-                colorHighlight="#eaff94"
-                originalColors={false}
-                inverted={false}
-                type="4x4"
-                size={1}
-                colorSteps={4}
-                fit="cover"
-              />
-            </div>
-          </foreignObject>
-        </svg>
-
+            <foreignObject x="0" y="0" width="871" height="720" clipPath="url(#hero-shape)">
+              <div style={{ width: '100%', height: '100%' }}>
+                <ImageDithering
+                  width={871}
+                  height={720}
+            image="https://pbs.twimg.com/media/G4CN9vdWUAAfiVD.jpg"
+            colorBack="#000c38"
+            colorFront="#94ffaf"
+            colorHighlight="#eaff94"
+            originalColors={false}
+            inverted={false}
+            type="4x4"
+            size={1}
+            colorSteps={4}
+            fit="cover"
+          />
+              </div>
+            </foreignObject>
+          </svg>
+        </div>
         {/* Foreground UI overlay */}
-        <div className="absolute inset-0 z-10 flex flex-col pointer-events-none text-white">
+        <div className="relative z-10 flex flex-col text-white min-h-[95vh] md:min-h-[850px] md:aspect-[871/720] pb-[25vw] md:pb-[18vw]">
           {/* Navigation */}
-          <nav className="w-full flex justify-between items-center px-[3%] py-[2.5%] pointer-events-auto">
+          <nav className="w-full flex justify-between items-center px-4 md:px-[3%] py-4 md:py-[2.5%] pointer-events-auto">
             {/* Logo */}
             <div className="flex items-center ">
               <img
                 src={DemutualLogo}
                 alt="Demutual"
-                className="w-16 h-16 object-contain "
+                className="w-12 h-12 md:w-16 md:h-16 object-contain "
               />
-              <span className="font-semibold text-[22px] tracking-tight text-white">Demutual</span>
+              <span className="font-semibold text-lg md:text-[22px] tracking-tight text-white ">Demutual</span>
             </div>
 
             {/* Links */}
             <div className="hidden md:flex items-center space-x-7 text-[15px] font-medium tracking-tight text-white">
-              <button type="button" className="flex items-center hover:text-white transition-colors">
+              <button type="button" className="flex items-center hover:text-white/80 transition-colors">
                 What do we do
               </button>
-              <button type="button" className="flex items-center hover:text-white transition-colors">
+              <button type="button" className="flex items-center hover:text-white/80 transition-colors">
                 Why us
               </button>
-              <button type="button" className="flex items-center hover:text-white transition-colors">
-                contact us
+              <button type="button" className="flex items-center hover:text-white/80 transition-colors">
+                Contact us
               </button>
             </div>
 
@@ -76,18 +79,18 @@ export function Landing() {
             <button
               type="button"
               onClick={goDashboard}
-              className="bg-white text-[#242424] px-5 py-2.5 rounded-lg text-[14px] font-semibold tracking-tight hover:bg-white/90 transition-all"
+              className="bg-white text-[#242424] px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-sm md:text-[14px] font-semibold tracking-tight hover:bg-white/90 transition-all"
             >
               Get started
             </button>
           </nav>
 
           {/* Hero Content */}
-          <main className="flex-1 flex flex-col justify-start items-center text-center px-[2%] mt-[6%] pointer-events-auto">
-            <h1 className="text-[3vw] md:text-[5vw] xl:text-[70px] font-sans font-normal  tracking-tighter text-white mb-[2%] max-w-[900px] leading-[1.05]">
-              Create or Invest in <span className="font-serif italic  text-[#94ffaf] [text-shadow:2px_2px_20px_rgba(0,0,0,0.2)]">Decentralized</span><br /> Mutual Funds on <span className="font-serif italic text-[#94ffaf] [text-shadow:2px_2px_20px_rgba(0,0,0,0.2)] ">Solana</span>
+          <main className="flex flex-col items-center text-center px-4 md:px-[2%] mt-[8vh] md:mt-[11vh] pointer-events-auto">
+            <h1 className="text-5xl md:text-[5vw] xl:text-[70px] font-sans font-normal tracking-tighter text-white/ mb-4 md:mb-[2%] max-w-[900px] leading-[1.05]">
+              Create or Invest in <span className="font-serif italic text-[#94ffaf] [text-shadow:2px_2px_20px_rgba(0,0,0,0.2)]">Decentralized</span><br className="hidden md:block" /> Mutual Funds on <span className="font-serif italic text-[#94ffaf] [text-shadow:2px_2px_20px_rgba(0,0,0,0.2)] ">Solana</span>
             </h1>
-            <p className="text-[1.2vw] md:text-[20px] font-normal tracking-tight text-white max-w-[700px] mb-[3%] leading-[1.2]">
+            <p className="text-base md:text-[1.2vw] xl:text-[20px] font-normal tracking-tight  text-white/90 max-w-[700px] mb-8 md:mb-[3%] leading-[1.4] md:leading-[1.2]">
               Not sure what coins to buy? Start with buckets.
               Invest in curated portfolios, or create one yourself for others.
               Diversified, simple, and fully transparent.
@@ -95,11 +98,12 @@ export function Landing() {
             <button
               type="button"
               onClick={goDashboard}
-              className="bg-[#94ffaf] text-[#242424] px-7 py-2 rounded-md text-[15px] font-semibold tracking-tight hover:bg-[#94ffaf]/90 transition-all shadow-md"
+              className="bg-[#94ffaf] text-[#242424] px-6 py-3 md:px-7 md:py-2 rounded-md text-base md:text-[15px] font-semibold tracking-tight hover:bg-[#94ffaf]/90 transition-all shadow-md"
             >
               Get started
             </button>
           </main>
+
         </div>
       </div>
 
@@ -116,7 +120,7 @@ export function Landing() {
       </div>
 
       {/* How it Works Section */}
-      <section className="w-full max-w-7xl mx-auto mt-40 md:mt-64 px-6 md:px-12 py-32  rounded-[40px] text-black ">
+      <section className="w-full max-w-7xl mx-auto mt-16 md:mt-24 px-6 md:px-12 py-16 md:py-32 rounded-[40px] text-black ">
 
         {/* Row 1: Invest */}
         <div className="flex flex-col md:flex-row items-center gap-12 md:gap-24 mb-32">
