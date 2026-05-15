@@ -1710,7 +1710,7 @@ export function BucketDetailPage() {
                         {published ? "Published" : "Draft"}
                       </span>
                     </div>
-                    <div className="overflow-auto pr-1" style={{ maxHeight: "55vh" }}>
+                    <div className="overflow-auto pr-1" style={{ maxHeight: "65vh" }}>
                       {published && bucket.researchDoc?.trim() ? (
                         <div className="rounded-[1rem] border border-black/6 bg-white/70 px-5 py-4">
                           <ReactMarkdown components={researchMarkdownComponents}>
