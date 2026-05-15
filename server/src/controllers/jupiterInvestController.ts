@@ -187,9 +187,10 @@ const buildJupiterPlan = async ({
         // Delay to avoid Jupiter 429 rate limit on free tier
         await new Promise((resolve) => setTimeout(resolve, 600));
       } catch (e) {
-        console.error("[buildJupiterPlan leg]", outMint, e);
-        return status(400, response(false, null, errors.jupiterPlan400));
-      }
+         const msg = e instanceof Error ? e.message : String(e);
+         console.error("[buildJupiterPlan leg]", outMint, msg);
+         return status(400, response(false, null, msg));
+       }
     }
 
     const swapCount = legs.filter((l) => l.kind === "swap").length;
@@ -286,12 +287,13 @@ const buildJupiterPlan = async ({
       )
     );
   } catch (e) {
-    console.error("[buildJupiterPlan]", e);
-    return status(500, response(false, null, errors.serverError500));
-  }
-};
+     const msg = e instanceof Error ? e.message : String(e);
+     console.error("[buildJupiterPlan]", msg);
+     return status(500, response(false, null, msg));
+   }
+ };
 
-/** Per-leg complete: only successful legs credit the user's Deposit and bucket TVL.
+ /** Per-leg complete: only successful legs credit the user's Deposit and bucket TVL.
  * Idempotent for resume — running this multiple times for the same attempt updates the
  * single Deposit row by the delta of newly-successful legs (and bumps TVL by the delta).
  */
@@ -666,12 +668,13 @@ const buildJupiterLegOrder = async ({
       )
     );
   } catch (e) {
-    console.error("[buildJupiterLegOrder]", e);
-    return status(400, response(false, null, errors.jupiterPlan400));
-  }
-};
+     const msg = e instanceof Error ? e.message : String(e);
+     console.error("[buildJupiterLegOrder]", msg);
+     return status(400, response(false, null, msg));
+   }
+ };
 
-/** Build fresh Jupiter orders for multiple legs in one request AND create a `BasketAttempt`
+ /** Build fresh Jupiter orders for multiple legs in one request AND create a `BasketAttempt`
  * with one `BasketAttemptLeg` per swap (status PENDING). Returns `attemptId` + per-leg `legId`s
  * so the frontend can persist partial-fill outcomes to the right leg.
  */
@@ -799,25 +802,28 @@ const buildJupiterLegOrdersBatch = async ({
           where: { id: attempt.id },
           data: { status: "ABANDONED", abandonedAt: new Date() }
         });
-        return status(400, response(false, null, errors.jupiterPlan400));
-      }
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[buildJupiterLegOrdersBatch leg]", legRow.mint, msg);
+        return status(400, response(false, null, msg));
+       }
 
-      if (i < attempt.legs.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-      }
-    }
+       if (i < attempt.legs.length - 1) {
+         await new Promise((resolve) => setTimeout(resolve, 600));
+       }
+     }
 
-    return status(
-      200,
-      response(true, toJsonSafe({ attemptId: attempt.id, legs: out, slippageBps }), null)
-    );
-  } catch (e) {
-    console.error("[buildJupiterLegOrdersBatch]", e);
-    return status(400, response(false, null, errors.jupiterPlan400));
-  }
-};
+     return status(
+       200,
+       response(true, toJsonSafe({ attemptId: attempt.id, legs: out, slippageBps }), null)
+     );
+   } catch (e) {
+     const msg = e instanceof Error ? e.message : String(e);
+     console.error("[buildJupiterLegOrdersBatch]", msg);
+     return status(400, response(false, null, msg));
+   }
+ };
 
-/** Resume a PARTIAL/PENDING buy attempt: re-fetch fresh Jupiter orders for legs still in
+ /** Resume a PARTIAL/PENDING buy attempt: re-fetch fresh Jupiter orders for legs still in
  * PENDING or FAILED status. Already-SUCCESS legs are not re-quoted.
  */
 const resumeJupiterAttempt = async ({
@@ -898,35 +904,37 @@ const resumeJupiterAttempt = async ({
           minimumOutAmount: order.otherAmountThreshold || "0"
         });
       } catch (e) {
-        console.error("[resumeJupiterAttempt leg]", legRow.mint, e);
-        return status(400, response(false, null, errors.jupiterPlan400));
-      }
-      if (i < toResume.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-      }
-    }
+         const msg = e instanceof Error ? e.message : String(e);
+         console.error("[resumeJupiterAttempt leg]", legRow.mint, msg);
+         return status(400, response(false, null, msg));
+       }
+       if (i < toResume.length - 1) {
+         await new Promise((resolve) => setTimeout(resolve, 600));
+       }
+     }
 
-    return status(
-      200,
-      response(
-        true,
-        toJsonSafe({
-          attemptId: attempt.id,
-          slippageBps,
-          legs: out,
-          // Resume never re-charges fees; original feeTransferSignature persists if any.
-          feeTransferAlreadyPaid: !!attempt.feeTransferSignature
-        }),
-        null
-      )
-    );
-  } catch (e) {
-    console.error("[resumeJupiterAttempt]", e);
-    return status(500, response(false, null, errors.serverError500));
-  }
-};
+     return status(
+       200,
+       response(
+         true,
+         toJsonSafe({
+           attemptId: attempt.id,
+           slippageBps,
+           legs: out,
+           // Resume never re-charges fees; original feeTransferSignature persists if any.
+           feeTransferAlreadyPaid: !!attempt.feeTransferSignature
+         }),
+         null
+       )
+     );
+   } catch (e) {
+     const msg = e instanceof Error ? e.message : String(e);
+     console.error("[resumeJupiterAttempt]", msg);
+     return status(500, response(false, null, msg));
+   }
+ };
 
-export const jupiterInvestControllers = {
+ export const jupiterInvestControllers = {
   buildJupiterPlan,
   buildJupiterLegOrder,
   buildJupiterLegOrdersBatch,
