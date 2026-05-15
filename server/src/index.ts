@@ -3,6 +3,7 @@ import { Elysia, status } from "elysia";
 import { API_ROUTE_MANIFEST } from "./constants/apiManifest";
 import { corsOrigins, publicServiceInfo, serverPort } from "./config";
 import { prisma } from "./db";
+import { bootstrapCatalogFromJupiter } from "./services/catalogSync";
 import { authRoutes } from "./routes/authRoutes";
 import { assetRoutes } from "./routes/assetRoutes";
 import { bucketRoutes } from "./routes/bucketRoutes";
@@ -89,9 +90,12 @@ async function bootstrap() {
     .use(priceRoutes)
     .use(tokenInfoRoutes)
     .use(devnetRoutes)
-    .listen(serverPort(), () =>
-      console.log(`Demutual API listening on http://localhost:${serverPort()} (GET /health)`)
-    );
+    .listen(serverPort(), () => {
+      console.log(`Demutual API listening on http://localhost:${serverPort()} (GET /health)`);
+      bootstrapCatalogFromJupiter().catch((e) =>
+        console.warn("[startup] catalog sync failed", e)
+      );
+    });
 }
 
 void bootstrap();

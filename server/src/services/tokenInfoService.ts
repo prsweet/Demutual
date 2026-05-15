@@ -109,9 +109,10 @@ export async function getTokenInfo(rawMints: string[]): Promise<TokenInfoResult>
     const headers: Record<string, string> = { Accept: "application/json" };
     if (JUPITER_API_KEY) headers["x-api-key"] = JUPITER_API_KEY;
 
-    for (let i = 0; i < need.length; i += 100) {
-      const chunk = need.slice(i, i + 100);
-      try {
+    const chunkCount = Math.ceil(need.length / 100);
+    const results = await Promise.allSettled(
+      Array.from({ length: chunkCount }, async (_, i) => {
+        const chunk = need.slice(i * 100, i * 100 + 100);
         const u = new URL(`${TOKENS_HOST}/tokens/v2/search`);
         u.searchParams.set("query", chunk.join(","));
         const res = await fetch(u.toString(), { headers });
@@ -125,7 +126,7 @@ export async function getTokenInfo(rawMints: string[]): Promise<TokenInfoResult>
               });
             }
           }
-          continue;
+          return;
         }
         const body = (await res.json()) as unknown;
         const rows = Array.isArray(body) ? body : [];
@@ -150,17 +151,11 @@ export async function getTokenInfo(rawMints: string[]): Promise<TokenInfoResult>
             })
           });
         }
-      } catch (e) {
-        console.warn("[tokenInfoService chunk]", e);
-        for (const m of chunk) {
-          if (!cache.has(m)) {
-            cache.set(m, {
-              mint: m, name: null, symbol: null, iconUrl: null, decimals: null,
-              isVerified: false, isSus: false, organicScore: null, organicScoreLabel: null,
-              tags: [], asOf: now
-            });
-          }
-        }
+      })
+    );
+    for (const r of results) {
+      if (r.status === "rejected") {
+        console.warn("[tokenInfoService] chunk failed", r.reason);
       }
     }
   }

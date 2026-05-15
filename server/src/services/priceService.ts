@@ -57,9 +57,10 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (JUPITER_API_KEY) headers["x-api-key"] = JUPITER_API_KEY;
 
-    for (let i = 0; i < need.length; i += 50) {
-      const chunk = need.slice(i, i + 50);
-      try {
+    const chunkCount = Math.ceil(need.length / 50);
+    const results = await Promise.allSettled(
+      Array.from({ length: chunkCount }, async (_, i) => {
+        const chunk = need.slice(i * 50, i * 50 + 50);
         const u = new URL(`${PRICE_HOST}/price/v3`);
         u.searchParams.set("ids", chunk.join(","));
         const res = await fetch(u.toString(), { headers });
@@ -69,7 +70,7 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
               cache.set(m, { price: null, confidence: null, priceChange24h: null, asOf: now });
             }
           }
-          continue;
+          return;
         }
         const body = (await res.json()) as Record<
           string,
@@ -92,13 +93,11 @@ export async function getPrices(rawMints: string[]): Promise<PriceResult> {
             asOf: now
           });
         }
-      } catch (e) {
-        console.warn("[priceService chunk]", e);
-        for (const m of chunk) {
-          if (!cache.has(m)) {
-            cache.set(m, { price: null, confidence: null, priceChange24h: null, asOf: now });
-          }
-        }
+      })
+    );
+    for (const r of results) {
+      if (r.status === "rejected") {
+        console.warn("[priceService] chunk failed", r.reason);
       }
     }
   }
