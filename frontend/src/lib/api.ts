@@ -16,10 +16,7 @@ import type {
 const JWT_KEY = "demutual_jwt";
 
 export function getApiBaseUrl(): string {
-  const fromMeta =
-    typeof import.meta !== "undefined" &&
-    (import.meta as ImportMeta & { env?: Record<string, string> }).env?.BUN_PUBLIC_API_URL;
-  return (fromMeta || "https://demutual-production.up.railway.app").replace(/\/$/, "");
+  return process.env.BUN_PUBLIC_API_URL!;
 }
 
 export const api: AxiosInstance = axios.create({
