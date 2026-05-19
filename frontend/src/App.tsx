@@ -8,6 +8,7 @@ import { BucketResearchPage } from "./pages/BucketResearchPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { MyBucketsPage } from "./pages/MyBucketsPage";
 import { DesktopOnly } from "./components/DesktopOnly";
+import { NotFoundPage } from "./pages/NotFoundPage";
 
 function DesktopRoute({ children }: { children: React.ReactNode }) {
   return <DesktopOnly>{children}</DesktopOnly>;
@@ -66,6 +67,7 @@ export function App() {
             </DesktopRoute>
           }
         />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>
   );
